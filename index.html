@@ -960,8 +960,8 @@
         <div class="filter-group">
           <span class="filter-label">Map display</span>
           <div class="toggle-group" id="mapDisplayToggle">
-            <button class="toggle-btn active" data-val="routes">🚴 Routes</button>
             <button class="toggle-btn" data-val="all">All</button>
+            <button class="toggle-btn active" data-val="routes">🚴 Routes</button>
             <button class="toggle-btn" data-val="cafes">🍳 Cafés</button>
           </div>
         </div>
@@ -2288,7 +2288,15 @@ async function refreshMasterMap() {
       '#059669', // emerald
       '#7c3aed', // violet
     ];
+    // Dash patterns cycle independently of colours → 10 colours × 4 styles = 40 combos
+    const GPX_DASHES = [
+      null,          // solid
+      '12 6',        // dashed
+      '4 6',         // dotted
+      '12 4 4 4',    // dash-dot
+    ];
     const gpxColour = GPX_PALETTE[idx % GPX_PALETTE.length];
+    const gpxDash   = GPX_DASHES[Math.floor(idx / GPX_PALETTE.length) % GPX_DASHES.length];
 
     if (safe(route.gpx_url)) {
       new L.GPX(safe(route.gpx_url), {
@@ -2297,6 +2305,7 @@ async function refreshMasterMap() {
           color: gpxColour,
           opacity: 0.7,
           weight: 4,
+          dashArray: gpxDash,
         },
         marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '', wptIconUrls: { '': '' } }
       }).on('loaded', function(e) {
@@ -2312,10 +2321,10 @@ async function refreshMasterMap() {
           }
           if (layer.setStyle) {
             layer.on('mouseover', function() {
-              this.setStyle({ weight: 7, opacity: 1.0 });
+              this.setStyle({ weight: 7, opacity: 1.0, dashArray: gpxDash });
             });
             layer.on('mouseout', function() {
-              this.setStyle({ weight: 4, opacity: 0.7 });
+              this.setStyle({ weight: 4, opacity: 0.7, dashArray: gpxDash });
             });
           }
         });
