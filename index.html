@@ -856,6 +856,10 @@
         <div class="num" id="hero-mtb">—</div>
         <div class="label">MTB</div>
       </div>
+      <div class="hero-stat">
+        <div class="num" id="hero-gravel">—</div>
+        <div class="label">Gravel</div>
+      </div>
     </div>
   </div>
 </section>
@@ -1886,6 +1890,8 @@ function updateCounts() {
   document.getElementById('hero-road').textContent  = allRoutes.filter(r => safe(r.type).toLowerCase() === 'road').length;
   const mtbEl = document.getElementById('hero-mtb');
   if (mtbEl) mtbEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'mtb').length;
+  const gravelEl = document.getElementById('hero-gravel');
+  if (gravelEl) gravelEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'gravel').length;
 }
 
 function resetFilters() {
