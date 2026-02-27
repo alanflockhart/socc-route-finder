@@ -685,6 +685,7 @@
 
     .map-container { height: 340px; }
     .map-container .leaflet-container { height: 100%; width: 100%; }
+    .cafe-marker { background: none; border: none; }
 
     .elevation-wrap {
       padding: 0.75rem 1rem;
@@ -1816,11 +1817,10 @@ function addCafesToMap(map, fontSize) {
     const lon = parseFloat(cafe.lon);
     if (isNaN(lat) || isNaN(lon)) return;
     if (!bounds.contains([lat, lon])) return;
-    const w = Math.round(fontSize * 1.8);
-    const fillSz = Math.round(fontSize * 0.5);
-    const cafeIcon = L.divIcon({
-      html: `<div style="position:relative;display:inline-block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))"><span style="font-size:${fontSize}px;line-height:1">🥖</span><span style="position:absolute;font-size:${fillSz}px;top:-${Math.round(fillSz*0.15)}px;left:-${Math.round(fillSz*0.35)}px;transform:rotate(-25deg)">🍳</span><span style="position:absolute;font-size:${fillSz}px;top:${Math.round(fillSz*0.1)}px;right:-${Math.round(fillSz*0.2)}px;transform:rotate(20deg)">🥓</span></div>`,
-      iconSize: [w, fontSize], iconAnchor: [w/2, fontSize], className: ''
+    const cafeIcon = L.icon({
+      iconUrl: 'images/cafe-icon.png', shadowUrl: '',
+      iconSize: [fontSize, fontSize], iconAnchor: [fontSize/2, fontSize],
+      popupAnchor: [0, -fontSize], className: 'cafe-marker'
     });
     const name = escHtml(safe(cafe.cafe_name));
     L.marker([lat, lon], { icon: cafeIcon })
@@ -2220,9 +2220,10 @@ async function refreshMasterMap() {
       const lon = parseFloat(cafe.lon);
       if (isNaN(lat) || isNaN(lon)) return;
 
-      const cafeIcon = L.divIcon({
-        html: '<div style="position:relative;display:inline-block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))"><span style="font-size:30px;line-height:1">🥖</span><span style="position:absolute;font-size:15px;top:-2px;left:-5px;transform:rotate(-25deg)">🍳</span><span style="position:absolute;font-size:15px;top:2px;right:-3px;transform:rotate(20deg)">🥓</span></div>',
-        iconSize: [54, 30], iconAnchor: [27, 30], className: ''
+      const cafeIcon = L.icon({
+        iconUrl: 'images/cafe-icon.png', shadowUrl: '',
+        iconSize: [36, 36], iconAnchor: [18, 36],
+        popupAnchor: [0, -36], className: 'cafe-marker'
       });
       const name = escHtml(safe(cafe.cafe_name));
       L.marker([lat, lon], { icon: cafeIcon })
