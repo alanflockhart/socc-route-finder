@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOCC Route Finder — Swavesey & Over Cycling Club</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+
+  <style>
+    /* ─── DESIGN TOKENS ─────────────────────────────────────────── */
+    :root {
+      --navy:       #1a2e4a;
+      --navy-light: #243d62;
+      --navy-dark:  #111e30;
+      --orange:     #e8621a;
+      --orange-light: #f0824a;
+      --orange-dim: rgba(232,98,26,0.12);
+      --white:      #ffffff;
+      --grey-50:    #f7f8fa;
+      --grey-100:   #eef0f4;
+      --grey-200:   #dce0e8;
+      --grey-400:   #8c97a8;
+      --grey-600:   #4e5d6e;
+      --grey-800:   #2a3440;
+      --green:      #1db87a;
+      --amber:      #f0a500;
+      --red:        #e03636;
+      --teal:       #1ab8b8;
+      --blue:       #1a72d4;
+      --purple:     #8b54d6;
+
+      --font-main: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+
+      --radius:     10px;
+      --radius-sm:  6px;
+      --shadow-sm:  0 1px 4px rgba(0,0,0,.08);
+      --shadow:     0 4px 16px rgba(0,0,0,.12);
+      --shadow-lg:  0 8px 32px rgba(0,0,0,.18);
+      --transition: 0.2s ease;
+    }
+
+    /* ─── RESET ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-main);
+      background: var(--grey-50);
+      color: var(--grey-800);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+    img { display: block; max-width: 100%; }
+
+    /* ─── HEADER ─────────────────────────────────────────────────── */
+    .site-header {
+      background: var(--navy-dark);
+      padding: 0 1.5rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 3px solid var(--orange);
+    }
+    .site-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .site-header .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--orange);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .site-header .logo-icon svg { width: 20px; height: 20px; fill: white; }
+    .brand-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 0.01em;
+    }
+    .brand-sub {
+      font-size: 0.7rem;
+      color: var(--grey-400);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .header-tag {
+      background: var(--orange);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+    }
+
+    /* ─── HERO BANNER ────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 60%, #2a4a7a 100%);
+      padding: 2rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -60px;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: rgba(232,98,26,0.07);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; left: 30%;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.03);
+      pointer-events: none;
+    }
+    .hero-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .hero h1 {
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      color: white;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+    .hero h1 span { color: var(--orange); }
+    .hero-sub {
+      margin-top: 0.5rem;
+      color: rgba(255,255,255,0.65);
+      font-size: 0.9rem;
+    }
+    .hero-stats {
+      margin-top: 1.25rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .hero-stat {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+    .hero-stat .num {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--orange);
+      font-family: var(--font-mono);
+      line-height: 1;
+    }
+    .hero-stat .label {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.6);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ─── MAIN LAYOUT ────────────────────────────────────────────── */
+    .app-body {
+      flex: 1;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* ─── FILTER SIDEBAR ─────────────────────────────────────────── */
+    .sidebar {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--grey-200);
+      position: sticky;
+      top: 75px;
+    }
+    .sidebar-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid var(--grey-100);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--grey-400);
+    }
+    .result-count {
+      font-size: 0.75rem;
+      background: var(--navy);
+      color: white;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .sidebar-body { padding: 1rem 1.25rem; }
+    .filter-group { margin-bottom: 1.25rem; }
+    .filter-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--grey-600);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    /* Range sliders */
+    .range-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .range-row { display: flex; align-items: center; gap: 0.5rem; }
+    .range-val {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--navy);
+      font-weight: 600;
+      min-width: 48px;
+      text-align: right;
+    }
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--grey-200);
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--orange);
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+      transition: transform var(--transition);
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+    /* Toggle buttons */
+    .toggle-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .toggle-btn {
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1.5px solid var(--grey-200);
+      background: white;
+      color: var(--grey-600);
+      transition: all var(--transition);
+    }
+    .toggle-btn.active {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: white;
+    }
+    .toggle-btn:hover:not(.active) {
+      border-color: var(--navy);
+      color: var(--navy);
+    }
+
+    /* Checkbox grid */
+    .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: var(--grey-600);
+      font-weight: 500;
+    }
+    .check-item input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: var(--orange);
+      cursor: pointer;
+    }
+
+    /* Switch toggles */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .switch-label { font-size: 0.8rem; color: var(--grey-600); font-weight: 500; }
+    .switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch-track {
+      position: absolute;
+      inset: 0;
+      background: var(--grey-200);
+      border-radius: 10px;
+      transition: background var(--transition);
+      cursor: pointer;
+    }
+    .switch-track::after {
+      content: '';
+      position: absolute;
+      left: 2px; top: 2px;
+      width: 16px; height: 16px;
+      background: white;
+      border-radius: 50%;
+      transition: transform var(--transition);
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .switch input:checked + .switch-track { background: var(--orange); }
+    .switch input:checked + .switch-track::after { transform: translateX(16px); }
+
+    .reset-btn {
+      width: 100%;
+      padding: 0.6rem;
+      border-radius: var(--radius-sm);
+      background: var(--grey-100);
+      color: var(--grey-600);
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid var(--grey-200);
+      transition: all var(--transition);
+      margin-top: 0.25rem;
+    }
+    .reset-btn:hover { background: var(--navy); color: white; border-color: var(--navy); }
+
+    /* Sort row */
+    .sort-row {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sort-label { font-size: 0.75rem; color: var(--grey-400); font-weight: 600; white-space: nowrap; }
+    .sort-select {
+      flex: 1;
+      border: 1.5px solid var(--grey-200);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.78rem;
+      font-family: inherit;
+      color: var(--grey-800);
+      background: white;
+      outline: none;
+    }
+    .sort-select:focus { border-color: var(--orange); }
+
+    /* ─── ROUTE CARDS ────────────────────────────────────────────── */
+    .cards-area {}
+
+    /* ─── VIEW TOGGLE TABS ───────────────────────────────────────── */
+    .view-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid var(--grey-200);
+      padding-bottom: 0;
+    }
+    .view-tab {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--grey-400);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      border-radius: 4px 4px 0 0;
+    }
+    .view-tab:hover  { color: var(--navy); }
+    .view-tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+    /* ─── MASTER MAP ─────────────────────────────────────────────── */
+    #masterMapPanel { display: none; }
+    #masterMapPanel.active { display: block; }
+    #masterMap {
+      width: 100%;
+      height: calc(100vh - 220px);
+      min-height: 420px;
+      border-radius: 10px;
+      border: 1px solid var(--grey-200);
+      box-shadow: var(--shadow-sm);
+    }
+    .map-route-popup { font-family: inherit; min-width: 200px; }
+    .map-route-popup .pop-name {
+      font-weight: 700; font-size: 0.95rem; color: var(--navy); margin-bottom: 0.4rem;
+    }
+    .map-route-popup .pop-stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem;
+      font-size: 0.8rem; color: var(--grey-600); margin-bottom: 0.6rem;
+    }
+    .map-route-popup .pop-btn {
+      display: block; width: 100%; padding: 0.4rem;
+      background: var(--orange); color: white; border: none; border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center;
+    }
+    .map-route-popup .pop-btn:hover { background: var(--navy); }
+    .master-map-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 200px; color: var(--grey-400); font-size: 0.95rem;
+      border: 2px dashed var(--grey-200); border-radius: 10px;
+    }
+    .cards-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .cards-toolbar .sort-row { margin-bottom: 0; }
+    .routes-grid { display: flex; flex-direction: column; gap: 1rem; }
+
+    .route-card {
+      background: white;
+      border-radius: var(--radius);
+      border: 1px solid var(--grey-200);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      transition: box-shadow var(--transition), transform var(--transition);
+    }
+    .route-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+    .route-card:target, .route-card.highlighted {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px var(--orange-dim), var(--shadow);
+    }
+
+    .card-main { padding: 1.1rem 1.25rem 1rem; }
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .route-name {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .route-source {
+      font-size: 0.7rem;
+      color: var(--grey-400);
+      margin-top: 0.2rem;
+    }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      padding: 0.22rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    /* Distance badge colours */
+    .badge-dist-green  { background: #d4f4e8; color: #0e7d52; }
+    .badge-dist-amber  { background: #fef3d7; color: #9b6b00; }
+    .badge-dist-red    { background: #fde8e8; color: #9b1c1c; }
+    .badge-ascent      { background: #e8edf7; color: #2a4a8a; }
+    .badge-type-road   { background: #e8edf7; color: #1a3d7c; }
+    .badge-type-gravel { background: #fef0e6; color: #8b3d0a; }
+    .badge-busway      { background: #eaf4ff; color: #1a5ca8; }
+    /* Direction badges */
+    .badge-dir-N   { background: #e8f7f0; color: #0e6b4a; }
+    .badge-dir-S   { background: #fef3d7; color: #9b6b00; }
+    .badge-dir-E   { background: #edf3fe; color: #2747a0; }
+    .badge-dir-W   { background: #dff0fa; color: #0e5c8a; }
+    .badge-dir-NE  { background: #eafaf4; color: #0a7a5a; }
+    .badge-dir-NW  { background: #e0f5f5; color: #0a6b6b; }
+    .badge-dir-SE  { background: #fdf0e6; color: #8b4a00; }
+    .badge-dir-SW  { background: #f0e8fd; color: #5a2a9b; }
+
+    .card-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.6rem;
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      background: var(--grey-50);
+      border-radius: var(--radius-sm);
+    }
+    .meta-item {}
+    .meta-key {
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--grey-400);
+      font-weight: 600;
+    }
+    .meta-val {
+      font-size: 0.85rem;
+      color: var(--navy);
+      font-weight: 600;
+      margin-top: 0.15rem;
+    }
+    .meta-val.mono { font-family: var(--font-mono); }
+
+    .cafe-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: #fffbf5;
+      border-radius: var(--radius-sm);
+      border: 1px solid #f5e6cc;
+      margin-bottom: 0.75rem;
+    }
+    .cafe-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+    .cafe-name {
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: var(--grey-800);
+    }
+    .cafe-name a { color: var(--orange); }
+    .cafe-name a:hover { text-decoration: underline; }
+    .cafe-hours { font-size: 0.75rem; color: var(--grey-400); margin-top: 0.15rem; }
+
+    .last-ridden {
+      font-size: 0.72rem;
+      color: var(--grey-400);
+      margin-bottom: 0.5rem;
+    }
+    .last-ridden span { font-weight: 600; color: var(--grey-600); }
+
+    .warning-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.4rem;
+      background: #fff8e6;
+      border: 1px solid #f5c842;
+      border-radius: var(--radius-sm);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.78rem;
+      color: #7a5000;
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+    .warning-banner.has-roadwork { border-color: #f0a040; }
+    .roadwork-badge {
+      display: inline-block;
+      background: #ff6600;
+      color: white;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.4rem;
+      letter-spacing: 0.04em;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--grey-100);
+      margin-top: 0.75rem;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      font-weight: 700;
+      transition: all var(--transition);
+      letter-spacing: 0.02em;
+    }
+    .btn-map {
+      background: var(--navy);
+      color: white;
+    }
+    .btn-map:hover { background: var(--navy-light); }
+    .btn-map.active { background: var(--orange); }
+    .btn-gpx {
+      background: var(--green);
+      color: white;
+    }
+    .btn-gpx:hover { opacity: 0.85; }
+    .btn-gpx:disabled {
+      background: var(--grey-200);
+      color: var(--grey-400);
+      cursor: not-allowed;
+    }
+    .btn-garmin {
+      background: white;
+      color: var(--navy);
+      border: 1.5px solid var(--grey-200);
+    }
+    .btn-garmin:hover { border-color: var(--navy); background: var(--grey-50); }
+    .btn-share {
+      background: white;
+      color: var(--grey-600);
+      border: 1.5px solid var(--grey-200);
+      margin-left: auto;
+    }
+    .btn-share:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* Map panel */
+    .map-panel {
+      display: none;
+      border-top: 3px solid var(--orange);
+      background: var(--grey-50);
+    }
+    .map-panel.open { display: block; }
+
+    .stats-bar {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      background: var(--navy);
+      padding: 0;
+    }
+    .stats-bar-item {
+      flex: 1;
+      min-width: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.7rem 0.5rem;
+      border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .stats-bar-item:last-child { border-right: none; }
+    .stats-bar-icon { font-size: 0.9rem; }
+    .stats-bar-val {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--orange);
+      font-family: var(--font-mono);
+      line-height: 1.1;
+    }
+    .stats-bar-key {
+      font-size: 0.6rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      margin-top: 0.15rem;
+    }
+
+    .map-container { height: 340px; }
+    .map-container .leaflet-container { height: 100%; width: 100%; }
+
+    .elevation-wrap {
+      padding: 0.75rem 1rem;
+      background: white;
+      border-top: 1px solid var(--grey-100);
+    }
+    .elevation-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--grey-400);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .elevation-chart-wrap { height: 80px; }
+
+    /* ─── EMPTY STATE ────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--grey-400);
+    }
+    .empty-state .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state h3 { color: var(--grey-600); font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .empty-state p { font-size: 0.875rem; margin-bottom: 1.25rem; }
+    .empty-reset {
+      display: inline-block;
+      background: var(--orange);
+      color: white;
+      padding: 0.5rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+
+    /* ─── LOADING STATE ──────────────────────────────────────────── */
+    .loading-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--grey-400);
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--grey-200);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── FOOTER ─────────────────────────────────────────────────── */
+    .site-footer {
+      background: var(--navy-dark);
+      color: rgba(255,255,255,0.4);
+      text-align: center;
+      font-size: 0.72rem;
+      padding: 1.25rem;
+      margin-top: 2rem;
+      line-height: 1.6;
+    }
+
+    /* Mobile filter toggle */
+    .mobile-filter-toggle {
+      display: none;
+      width: 100%;
+      padding: 0.65rem 1rem;
+      background: var(--navy);
+      color: white;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border-radius: var(--radius);
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .mobile-filter-toggle span { font-size: 0.75rem; background: var(--orange); border-radius: 20px; padding: 0.15rem 0.5rem; }
+
+    /* ─── RESPONSIVE ─────────────────────────────────────────────── */
+    @media (max-width: 800px) {
+      .app-body {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+        gap: 0;
+      }
+      .sidebar {
+        position: static;
+        margin-bottom: 1rem;
+      }
+      .sidebar-body { display: none; }
+      .sidebar-body.open { display: block; }
+      .mobile-filter-toggle { display: flex; }
+      .hero { padding: 1.5rem 1rem; }
+      .hero-stats { gap: 1rem; }
+      .stats-bar { flex-wrap: wrap; }
+      .stats-bar-item { min-width: 60px; }
+      .card-meta { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+      .card-actions { gap: 0.4rem; }
+      .action-btn { padding: 0.4rem 0.65rem; font-size: 0.73rem; }
+      .card-meta { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* Hash highlight animation */
+    @keyframes highlightPulse {
+      0%   { box-shadow: 0 0 0 4px var(--orange); }
+      70%  { box-shadow: 0 0 0 8px rgba(232,98,26,0); }
+      100% { box-shadow: none; }
+    }
+    .route-card.pulse { animation: highlightPulse 1.2s ease-out; }
+
+    .tooltip { position: relative; }
+    .tooltip[data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--navy-dark);
+      color: white;
+      font-size: 0.7rem;
+      white-space: nowrap;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 200;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ── HEADER ────────────────────────────────────────────────────── -->
+<header class="site-header">
+  <div class="brand">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 17a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm14-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1a4 4 0 1 1 0-8 4 4 0 0 1 0 8ZM12 7.5l-3 3.5h6V9.5l2 1.5H12.5L15 7.5H12Zm-1-1.5h5l-2.5 3H17l3 2.25-3.5.25V13H9.5L8 11h2L12 8l-1-2Z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">SOCC</div>
+      <div class="brand-sub">Swavesey & Over Cycling Club</div>
+    </div>
+  </div>
+  <div class="header-tag">Route Finder</div>
+</header>
+
+<!-- ── HERO ──────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Find your next <span>SOCC</span> ride</h1>
+    <p class="hero-sub">Cambridgeshire routes, handpicked by the club — updated live from our route sheet</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="num" id="hero-total">—</div>
+        <div class="label">Routes available</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num" id="hero-road">—</div>
+        <div class="label">Road</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num" id="hero-mtb">—</div>
+        <div class="label">MTB</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEBUG PANEL — remove once working -->
+<div id="debugPanel" style="background:#111e30;color:#e8f0fe;font-family:monospace;font-size:0.78rem;padding:1rem 1.5rem;border-bottom:3px solid #e8621a;display:none">
+  <div style="max-width:1280px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">
+      <strong style="color:#e8621a;font-size:0.85rem;">🔧 Debug Panel — remove once working</strong>
+      <button onclick="document.getElementById('debugPanel').remove()" style="background:rgba(255,255,255,0.1);border:none;color:white;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.75rem">✕ Hide</button>
+    </div>
+    <div id="debugLog" style="display:flex;flex-direction:column;gap:0.3rem;"></div>
+  </div>
+</div>
+<script>
+  // Hide debug panel immediately if SHOW_DEBUG is false — avoids flash of panel on load
+  // (CONFIG is defined later in the main script block, so we check a data attribute instead)
+  document.getElementById('debugPanel').dataset.managed = '1';
+</script>
+
+<!-- ── APP BODY ───────────────────────────────────────────────────── -->
+<main class="app-body">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <button class="mobile-filter-toggle" id="filterToggle">
+      ⚙️ Filter Routes
+      <span id="activeFilterCount">0</span>
+    </button>
+    <div class="sidebar-header">
+      <span class="sidebar-title">Filters</span>
+      <span class="result-count" id="resultCount">— routes</span>
+    </div>
+    <div class="sidebar-body" id="sidebarBody">
+
+      <div style="padding-top:0.75rem">
+        <!-- Type -->
+        <div class="filter-group">
+          <span class="filter-label">Type</span>
+          <div class="toggle-group" id="typeToggle">
+            <button class="toggle-btn active" data-val="all">All</button>
+            <button class="toggle-btn" data-val="Road">🚴 Road</button>
+            <button class="toggle-btn" data-val="MTB">🚵 MTB</button>
+            <button class="toggle-btn" data-val="Gravel">🏕️ Gravel</button>
+          </div>
+        </div>
+
+        <!-- Distance -->
+        <div class="filter-group">
+          <span class="filter-label">Distance (miles)</span>
+          <div class="range-group">
+            <div class="range-row">
+              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Min</span>
+              <input type="range" id="distMin" min="0" max="160" value="0" step="1">
+              <span class="range-val" id="distMinVal">0 mi</span>
+            </div>
+            <div class="range-row">
+              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Max</span>
+              <input type="range" id="distMax" min="0" max="160" value="160" step="5">
+              <span class="range-val" id="distMaxVal">100 mi</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ascent -->
+        <div class="filter-group">
+          <span class="filter-label">Ascent (metres)</span>
+          <div class="range-group">
+            <div class="range-row">
+              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Min</span>
+              <input type="range" id="ascentMin" min="0" max="1000" value="0" step="10">
+              <span class="range-val" id="ascentMinVal">0 m</span>
+            </div>
+            <div class="range-row">
+              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Max</span>
+              <input type="range" id="ascentMax" min="0" max="2500" value="2500" step="25">
+              <span class="range-val" id="ascentMaxVal">1000 m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Direction -->
+        <div class="filter-group">
+          <span class="filter-label">Direction</span>
+          <div class="checkbox-grid" id="dirChecks">
+            <label class="check-item"><input type="checkbox" value="N" checked> N</label>
+            <label class="check-item"><input type="checkbox" value="NE" checked> NE</label>
+            <label class="check-item"><input type="checkbox" value="E" checked> E</label>
+            <label class="check-item"><input type="checkbox" value="SE" checked> SE</label>
+            <label class="check-item"><input type="checkbox" value="S" checked> S</label>
+            <label class="check-item"><input type="checkbox" value="SW" checked> SW</label>
+            <label class="check-item"><input type="checkbox" value="W" checked> W</label>
+            <label class="check-item"><input type="checkbox" value="NW" checked> NW</label>
+          </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="filter-group">
+          <span class="filter-label">Options</span>
+          <div class="switch-row">
+            <span class="switch-label">☕ Café stop only</span>
+            <label class="switch">
+              <input type="checkbox" id="cafeToggle">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <div class="switch-row">
+            <span class="switch-label">🚌 Exclude busway</span>
+            <label class="switch">
+              <input type="checkbox" id="buswayToggle">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Sort -->
+        <div class="filter-group">
+          <span class="filter-label">Sort by</span>
+          <select class="sort-select" id="sortSelect">
+            <option value="name">Name A–Z</option>
+            <option value="dist_asc">Distance ↑</option>
+            <option value="dist_desc">Distance ↓</option>
+            <option value="ascent">Ascent ↑</option>
+            <option value="last_ridden">Last Ridden</option>
+          </select>
+        </div>
+
+        <button class="reset-btn" id="resetBtn">↺ Reset all filters</button>
+        <button class="reset-btn" onclick="clearCache()" style="margin-top:0.4rem;font-size:0.72rem;">
+          🔄 Refresh route data
+        </button>
+        <div id="cacheAge" style="font-size:0.68rem;color:var(--grey-400);text-align:center;margin-top:0.4rem;"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Cards / Map -->
+  <section class="cards-area">
+
+    <!-- View toggle tabs -->
+    <div class="view-tabs">
+      <button class="view-tab active" id="tabList" onclick="switchView('list')">📋 List</button>
+      <button class="view-tab"        id="tabMap"  onclick="switchView('map')">🗺️ Map</button>
+    </div>
+
+    <!-- List view -->
+    <div id="listPanel">
+      <div id="routesGrid" class="routes-grid">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading routes from the club sheet…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Master map view -->
+    <div id="masterMapPanel">
+      <div id="masterMap"></div>
+    </div>
+
+  </section>
+
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  SOCC — Swavesey & Over Cycling Club &nbsp;|&nbsp;
+  Route data maintained by club organisers &nbsp;|&nbsp;
+  Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style="color:rgba(255,255,255,0.55)">OpenStreetMap</a> contributors
+</footer>
+
+<!-- ─── SCRIPTS ──────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   CONFIG — Update these to point to your Google Sheet
+   ════════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  SHEET_ID:      '2PACX-1vQflvwcr6Nf1NVyvv45Jt7YWF3fxZO0ecaN8JwMYU4gQeghoYR7eLmkGS7zfSqdlA8VuiIhkQ4eCAYz',
+  SHEET_NAME:    'Routes',
+  SHEET_GID:     '429694098',
+  USE_DEMO_DATA: false,
+  SHOW_DEBUG:    false,          // true = show debug panel; false = hidden
+
+  // Maps your actual sheet column headers → internal app field names (all lowercase keys)
+  COLUMN_MAP: {
+    '':                               'type',           // unnamed 3rd column contains Road/MTB
+    'ridable':                        'rideable',
+    'route name':                     'route_name',
+    'distance miles':                 'distance_miles',
+    'ascent (per garmin)':            'ascent_metres',
+    'garmin connect link':            'garmin_link',
+    'last ride':                      'last_ridden',
+    'busway segment':                 'busway_segment',
+    'speed':                          'recommended_speed_mph',
+    'time':                           'estimated_time_raw',  // decimal hours e.g. 1.746 — converted below
+    'time inc 30 minute coffee stop': 'time_with_coffee',
+    'roy group':                      'roy_group',
+    'new routes number':              'route_number',
+    'debrief':                        'notes_debrief',
+    'direction':                      'direction',
+    'notes':                          'notes',
+    'source':                         'source',
+    'comparison':                     'comparison',
+    'start_lat':                      'start_lat',
+    'start_lon':                      'start_lon',
+  },
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   DEMO DATA — Representative sample for development / preview
+   ════════════════════════════════════════════════════════════════════ */
+const DEMO_ROUTES = [
+  {
+    route_name: "Johnson's Old Hurst",
+    type: "Road", direction: "NW",
+    distance_miles: 27.07, ascent_metres: 119,
+    estimated_time: "1 h 45 min", time_with_coffee: "2 h 15 min",
+    recommended_speed_mph: 15.5,
+    cafe_name: "Johnson's Coffee Shop",
+    cafe_hours: "Tue–Fri 7am–4pm, Sat–Sun 9am–2pm, Closed Mon",
+    cafe_maps_url: "https://maps.google.com/?q=52.36,-0.09",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "10 Jan", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Roy's route", date_added: "2024-01-01",
+  },
+  {
+    route_name: "Ely Cathedral Loop",
+    type: "Road", direction: "N",
+    distance_miles: 38.4, ascent_metres: 85,
+    estimated_time: "2 h 30 min", time_with_coffee: "3 h 00 min",
+    recommended_speed_mph: 15,
+    cafe_name: "Peacocks Tea Room",
+    cafe_hours: "Mon–Sun 9am–5pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.398,0.264",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "3 Feb", rideable: true,
+    busway_segment: true,
+    notes: "Pothole on the A10 approach near Stretham — keep right",
+    source: "Club route", date_added: "2024-02-01",
+  },
+  {
+    route_name: "St Ives Riverside",
+    type: "Road", direction: "NW",
+    distance_miles: 22.5, ascent_metres: 60,
+    estimated_time: "1 h 30 min", time_with_coffee: "2 h 00 min",
+    recommended_speed_mph: 14,
+    cafe_name: "The Bridge Café",
+    cafe_hours: "Sat–Sun 8am–3pm only",
+    cafe_maps_url: "https://maps.google.com/?q=52.33,-0.07",
+    garmin_link: "",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "", rideable: true,
+    busway_segment: true,
+    notes: "Roadworks at Fen Drayton junction until end of March",
+    source: "Roy's route", date_added: "2024-03-01",
+  },
+  {
+    route_name: "Gog Magog Gravel",
+    type: "Gravel", direction: "SE",
+    distance_miles: 31.2, ascent_metres: 310,
+    estimated_time: "2 h 20 min", time_with_coffee: "2 h 50 min",
+    recommended_speed_mph: 13,
+    cafe_name: "Gog Farm Shop Café",
+    cafe_hours: "Mon–Sun 9am–4pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.16,0.18",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "18 Jan", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Club route", date_added: "2024-03-15",
+  },
+  {
+    route_name: "Huntingdon Flat 50",
+    type: "Road", direction: "W",
+    distance_miles: 51.8, ascent_metres: 145,
+    estimated_time: "3 h 20 min", time_with_coffee: "3 h 55 min",
+    recommended_speed_mph: 15.5,
+    cafe_name: "",
+    cafe_hours: "",
+    cafe_maps_url: "",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "22 Dec", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Roy's route", date_added: "2023-12-01",
+  },
+  {
+    route_name: "Grafham Water Circuit",
+    type: "Gravel", direction: "W",
+    distance_miles: 19.8, ascent_metres: 95,
+    estimated_time: "1 h 25 min", time_with_coffee: "1 h 55 min",
+    recommended_speed_mph: 13.5,
+    cafe_name: "Grafham Visitor Centre Café",
+    cafe_hours: "Sat–Sun 10am–4pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.29,-0.29",
+    garmin_link: "",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "5 Jan", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Club route", date_added: "2024-01-05",
+  },
+  {
+    route_name: "Newmarket Heath Blast",
+    type: "Road", direction: "E",
+    distance_miles: 44.3, ascent_metres: 180,
+    estimated_time: "2 h 50 min", time_with_coffee: "3 h 25 min",
+    recommended_speed_mph: 16,
+    cafe_name: "The National Stud Café",
+    cafe_hours: "Mon–Fri 9am–3pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.23,0.39",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "12 Nov", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Roy's route", date_added: "2023-11-01",
+  },
+  {
+    route_name: "Wicken Fen Explorer",
+    type: "Gravel", direction: "NE",
+    distance_miles: 28.9, ascent_metres: 48,
+    estimated_time: "2 h 10 min", time_with_coffee: "2 h 40 min",
+    recommended_speed_mph: 13,
+    cafe_name: "Wicken Fen Visitor Centre",
+    cafe_hours: "Mon–Sun 10am–4pm (seasonal)",
+    cafe_maps_url: "https://maps.google.com/?q=52.30,0.30",
+    garmin_link: "",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "8 Feb", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Club route", date_added: "2024-02-08",
+  },
+];
+
+/* ════════════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════════════ */
+let allRoutes = [];
+let filteredRoutes = [];
+let openMaps = {};   // cardId → leaflet map instance
+let filterTimer = null;
+
+const state = {
+  type: 'all',
+  distMin: 0, distMax: 160,
+  ascentMin: 0, ascentMax: 2500,
+  directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
+  cafeOnly: false,
+  excludeBusway: false,
+  sort: 'name',
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   DATA FETCHING — with localStorage cache (1 hour TTL)
+   ════════════════════════════════════════════════════════════════════ */
+const CACHE_KEY = 'socc_routes_cache';
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
+
+// DEBUG: force clear cache on every load so column mapping changes take effect immediately
+// Remove this line once routes are displaying correctly
+localStorage.removeItem(CACHE_KEY);
+
+function dbg(msg, ok) {
+  if (!CONFIG.SHOW_DEBUG) return;
+  console.log('SOCC DEBUG:', msg);
+  const log = document.getElementById('debugLog');
+  if (!log) return;
+  const row = document.createElement('div');
+  row.style.cssText = `padding:0.3rem 0.5rem;border-radius:4px;background:${ok === false ? 'rgba(224,54,54,0.2)' : ok === true ? 'rgba(29,184,122,0.15)' : 'rgba(255,255,255,0.05)'}`;
+  row.innerHTML = `<span style="color:${ok === false ? '#f87171' : ok === true ? '#4ade80' : '#93c5fd'}">${ok === false ? '✗' : ok === true ? '✓' : '→'}</span> ${msg}`;
+  log.appendChild(row);
+}
+
+async function fetchRoutes() {
+  dbg(`CONFIG.USE_DEMO_DATA = ${CONFIG.USE_DEMO_DATA}`);
+  dbg(`CONFIG.SHEET_ID = ${CONFIG.SHEET_ID.slice(0,20)}...`);
+  dbg(`CONFIG.SHEET_GID = ${CONFIG.SHEET_GID}`);
+
+  if (CONFIG.USE_DEMO_DATA) {
+    const demo = DEMO_ROUTES.filter(r => r.rideable !== false);
+    dbg(`Demo mode — returning ${demo.length} routes`, true);
+    return demo;
+  }
+
+  // Return cached data if still fresh
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      const ageMins = Math.floor((Date.now() - cached.timestamp) / 60000);
+      dbg(`Cache hit — ${cached.data.length} routes, ${ageMins} min old`, true);
+      showCacheAge(cached.timestamp);
+      return cached.data;
+    } else if (cached) {
+      dbg(`Cache expired — fetching fresh`);
+    } else {
+      dbg(`No cache found — fetching fresh`);
+    }
+  } catch(e) {
+    dbg(`Cache read error: ${e.message}`, false);
+  }
+
+  // Fetch fresh from sheet
+  const url = `https://docs.google.com/spreadsheets/d/e/${CONFIG.SHEET_ID}/pub?gid=${CONFIG.SHEET_GID}&single=true&output=csv`;
+  dbg(`Fetching: ${url.slice(0,80)}...`);
+
+  let res;
+  try {
+    res = await fetch(url);
+    dbg(`HTTP status: ${res.status} ${res.statusText}`, res.ok);
+  } catch(e) {
+    if (location.protocol === 'file:') {
+      dbg('✗ Running as file:// — browsers block fetch() from local files. Serve via http:// instead:', false);
+      dbg('  → Option A: run  npx serve .  then open http://localhost:3000', false);
+      dbg('  → Option B: run  python3 -m http.server 8080  then open http://localhost:8080', false);
+      dbg('  → Option C: VS Code → right-click index.html → Open with Live Server', false);
+      dbg('  → Or just deploy to Netlify — it will work fine there', false);
+    } else {
+      dbg(`Fetch failed (network/CORS): ${e.message}`, false);
+    }
+    throw e;
+  }
+
+  let csv;
+  try {
+    csv = await res.text();
+    dbg(`Response length: ${csv.length} chars`);
+    dbg(`First 120 chars: ${csv.slice(0,120).replace(/\n/g,' ')}`);
+  } catch(e) {
+    dbg(`Failed to read response text: ${e.message}`, false);
+    throw e;
+  }
+
+  if (csv.length < 10) {
+    dbg('Response is empty — sheet may not be published correctly', false);
+    throw new Error('Empty CSV response');
+  }
+  if (csv.toLowerCase().includes('<html')) {
+    dbg('Response is HTML not CSV — likely a Google sign-in redirect', false);
+    throw new Error('Got HTML instead of CSV');
+  }
+
+  let parsed;
+  try {
+    parsed = parseCSV(csv);
+    dbg(`CSV parsed — ${parsed.length} total rows`);
+    if (parsed.length > 0) {
+      dbg(`Columns detected: ${Object.keys(parsed[0]).join(', ')}`);
+    }
+  } catch(e) {
+    dbg(`CSV parse error: ${e.message}`, false);
+    throw e;
+  }
+
+  // Check rideable column
+  const rideableVals = [...new Set(parsed.map(r => String(r.rideable)))];
+  dbg(`'rideable' values found: ${rideableVals.join(', ')}`);
+
+  const data = parsed.filter(r => {
+    const rv = String(r.rideable || '').toLowerCase().trim();
+    // Hide only if explicitly marked NO/false, or pending (?check cafe, argh, etc.)
+    if (r.rideable === false) return false;  // explicit NO
+    if (rv === '?check cafe') return false;
+    if (rv !== '' && rv !== 'true' && rv !== 'yes' && rv !== 'road' && rv !== 'mtb') return false;
+    return true;
+  });
+  dbg(`Rideable routes: ${data.length} of ${parsed.length}`, data.length > 0);
+
+  if (data.length === 0 && parsed.length > 0) {
+    dbg("⚠️ All routes filtered out — 'rideable' column must be YES/TRUE/true. Found: " + rideableVals.join(', '), false);
+  } else if (data.length < parsed.length) {
+    const excluded = parsed.length - data.length;
+    dbg(`ℹ️ ${excluded} rows excluded — rideable is NO/FALSE/empty/?Check cafe etc`);
+  }
+
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
+    dbg(`Cached ${data.length} routes to localStorage`, true);
+  } catch(e) {
+    dbg(`Cache write failed (storage full?): ${e.message}`, false);
+  }
+
+  showCacheAge(Date.now());
+  return data;
+}
+
+function clearCache() {
+  localStorage.removeItem(CACHE_KEY);
+  location.reload();
+}
+
+function showCacheAge(timestamp) {
+  const el = document.getElementById('cacheAge');
+  if (!el) return;
+  const mins = Math.floor((Date.now() - timestamp) / 60000);
+  el.textContent = mins < 1 ? 'Data: just refreshed' : `Data: ${mins} min${mins > 1 ? 's' : ''} ago`;
+}
+
+function parseCSV(csv) {
+  const lines = csv.trim().split('\n');
+  const rawHeaders = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+
+  // Normalise headers using COLUMN_MAP (case-insensitive lookup)
+  const headers = rawHeaders.map(h => {
+    const key = h.toLowerCase();
+    return CONFIG.COLUMN_MAP[key] || h; // mapped name, or original if not in map
+  });
+
+  return lines.slice(1).map(line => {
+    const vals = smartSplit(line);
+    const obj = {};
+    headers.forEach((h, i) => {
+      if (!h) return; // skip empty column headers
+      let v = (vals[i] || '').replace(/^"|"$/g, '').trim();
+      const vl = v.toLowerCase();
+      if (vl === 'true' || vl === 'yes' || v === '1') v = true;
+      else if (vl === 'false' || vl === 'no' || v === '0') v = false;
+      // blank stays as '' — handled in rideable filter (blank = show)
+      else if (!isNaN(v) && v !== '') v = parseFloat(v);
+      obj[h] = v;
+    });
+    // Normalise busway_segment: YES/yes → true, n/no/blank → false
+    if ('busway_segment' in obj) {
+      const bv = String(obj.busway_segment).toLowerCase().trim();
+      obj.busway_segment = (bv === 'yes' || bv === 'true' || bv === '1');
+    }
+    // Convert decimal-hours Time field to "X h YY min" string
+    if (obj.estimated_time_raw !== undefined && obj.estimated_time_raw !== '') {
+      const dh = parseFloat(obj.estimated_time_raw);
+      if (!isNaN(dh)) {
+        const h = Math.floor(dh);
+        const m = Math.round((dh - h) * 60);
+        obj.estimated_time = m > 0 ? `${h} h ${m} min` : `${h} h`;
+      }
+    }
+    return obj;
+  });
+}
+
+function smartSplit(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FILTERING & SORTING
+   ════════════════════════════════════════════════════════════════════ */
+function applyFilters() {
+  // DEBUG: log first route's raw values so we can see what fields look like
+  if (allRoutes.length > 0) {
+    const r0 = allRoutes[0];
+    dbg(`First route: "${r0.route_name}" | type:"${r0.type}" | dir:"${r0.direction}" | dist:${r0.distance_miles}`);
+    const dirVals = [...new Set(allRoutes.map(r => String(r.direction || '')))];
+    dbg(`All direction values in data: ${dirVals.join(', ')}`);
+  }
+
+  filteredRoutes = allRoutes.filter(r => {
+    // type — skip check if sheet has no type column (undefined = show all)
+    if (state.type !== 'all' && r.type && r.type !== state.type) return false;
+
+    // distance
+    const d = parseFloat(r.distance_miles) || 0;
+    if (d < state.distMin || d > state.distMax) return false;
+
+    // ascent
+    const a = parseFloat(r.ascent_metres) || 0;
+    if (a < state.ascentMin || a > state.ascentMax) return false;
+
+    // direction — normalise before matching, blank = pass through
+    const dir = normaliseDir(r.direction);
+    if (dir && !state.directions.has(dir)) return false;
+
+    // cafe
+    if (state.cafeOnly && !r.cafe_name) return false;
+
+    // busway
+    if (state.excludeBusway && r.busway_segment === true) return false;
+
+    return true;
+  });
+
+  dbg(`After filters: ${filteredRoutes.length} of ${allRoutes.length} routes visible`);
+  refreshMasterMap(); // keep master map in sync with filters
+
+  filteredRoutes.sort((a, b) => {
+    if (state.sort === 'name')       return safe(a.route_name).localeCompare(safe(b.route_name));
+    if (state.sort === 'dist_asc')   return (a.distance_miles||0) - (b.distance_miles||0);
+    if (state.sort === 'dist_desc')  return (b.distance_miles||0) - (a.distance_miles||0);
+    if (state.sort === 'ascent')     return (a.ascent_metres||0) - (b.ascent_metres||0);
+    if (state.sort === 'last_ridden') return (b.last_ridden||'').localeCompare(a.last_ridden||'');
+    return 0;
+  });
+
+  renderCards();
+  updateCounts();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════ */
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function distBadgeClass(mi) {
+  if (mi < 25) return 'badge-dist-green';
+  if (mi <= 40) return 'badge-dist-amber';
+  return 'badge-dist-red';
+}
+
+function dirBadgeClass(dir) {
+  return `badge-dir-${dir}`;
+}
+
+function hasRoadwork(notes) {
+  return notes && /pothole|roadworks/i.test(notes);
+}
+
+function escHtml(s) {
+  if (s === null || s === undefined || s === false) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// safe(): always returns a trimmed string, never undefined/null/number issues
+function safe(v) {
+  if (v === null || v === undefined || v === false || v === true) return '';
+  return String(v).trim();
+}
+
+// safeNum(): returns a number or 0
+function safeNum(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+// normaliseDir(): uppercase + trim, maps compound like "s/sw" -> "S"
+function normaliseDir(d) {
+  const s = safe(d).toUpperCase().replace(/\s/g,'');
+  // Handle compound directions like S/SW, N/NE — take the first part
+  if (s.includes('/')) return s.split('/')[0];
+  return s;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER
+   ════════════════════════════════════════════════════════════════════ */
+function renderCards() {
+  const grid = document.getElementById('routesGrid');
+
+  if (filteredRoutes.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🚴</div>
+        <h3>No routes match your filters</h3>
+        <p>Try widening your distance or ascent range, or deselecting some directions.</p>
+        <button class="empty-reset" onclick="resetFilters()">↺ Reset all filters</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = filteredRoutes.map((route, idx) => buildCard(route, idx)).join('');
+
+  // Restore open maps
+  filteredRoutes.forEach((route, idx) => {
+    const slug = slugify(route.route_name);
+    if (openMaps[slug]) {
+      setTimeout(() => openMapForCard(route, idx, slug), 50);
+    }
+  });
+
+  // Hash scroll
+  checkHash();
+}
+
+function buildCard(route, idx) {
+  const slug = slugify(route.route_name);
+  const dist = parseFloat(route.distance_miles) || 0;
+  const ascent = parseFloat(route.ascent_metres) || 0;
+  const gpxDisabled = !route.gpx_url ? 'disabled data-tip="GPX not yet available"' : '';
+  const garminDisabled = !route.garmin_link ? 'style="display:none"' : '';
+
+  const rw = hasRoadwork(safe(route.notes));
+  const warningHtml = safe(route.notes) ? `
+    <div class="warning-banner ${rw ? 'has-roadwork' : ''}">
+      ⚠️ <span>${escHtml(route.notes)}${rw ? '<span class="roadwork-badge">🚧 HAZARD</span>' : ''}</span>
+    </div>` : '';
+
+  const cafeHtml = safe(route.cafe_name) ? `
+    <div class="cafe-row">
+      <span class="cafe-icon">☕</span>
+      <div>
+        <div class="cafe-name">
+          ${route.cafe_maps_url
+            ? `<a href="${escHtml(route.cafe_maps_url)}" target="_blank" rel="noopener noreferrer">${escHtml(route.cafe_name)}</a>`
+            : escHtml(route.cafe_name)}
+        </div>
+        ${route.cafe_hours ? `<div class="cafe-hours">${escHtml(route.cafe_hours)}</div>` : ''}
+      </div>
+    </div>` : '';
+
+  const lastRidden = safe(route.last_ridden)
+    ? `<div class="last-ridden">Last ridden: <span>${escHtml(safe(route.last_ridden))}</span></div>`
+    : `<div class="last-ridden" style="color:var(--grey-300)">Never ridden</div>`;
+
+  const buswayBadge = (route.busway_segment === true || route.busway_segment === 'TRUE')
+    ? `<span class="badge badge-busway">🚌 Busway</span>` : '';
+
+  return `
+    <article class="route-card" id="route-${slug}">
+      <div class="card-main">
+        <div class="card-top">
+          <div>
+            <div class="route-name">${escHtml(route.route_name)}</div>
+            ${route.source ? `<div class="route-source">${escHtml(route.source)}</div>` : ''}
+          </div>
+          <div class="badges">
+            <span class="badge ${distBadgeClass(dist)}">📏 ${dist} mi</span>
+            <span class="badge badge-ascent">⛰ ${ascent} m</span>
+            ${safe(route.type) ? `<span class="badge badge-type-${safe(route.type).toLowerCase() === 'gravel' ? 'gravel' : 'road'}">${safe(route.type).toLowerCase() === 'gravel' ? '🏕' : '🚴'} ${escHtml(safe(route.type))}</span>` : ''}
+            ${normaliseDir(route.direction) ? `<span class="badge ${dirBadgeClass(normaliseDir(route.direction))}">🧭 ${escHtml(normaliseDir(route.direction))}</span>` : ''}
+            ${buswayBadge}
+          </div>
+        </div>
+
+        <div class="card-meta">
+          <div class="meta-item">
+            <div class="meta-key">⏱ Ride time</div>
+            <div class="meta-val">${escHtml(safe(route.estimated_time) || '—')}</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-key">☕ inc. coffee</div>
+            <div class="meta-val">${escHtml(safe(route.time_with_coffee) || '—')}</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-key">💨 Speed</div>
+            <div class="meta-val mono">${safeNum(route.recommended_speed_mph) || '—'} mph</div>
+          </div>
+        </div>
+
+        ${cafeHtml}
+        ${lastRidden}
+        ${warningHtml}
+
+        <div class="card-actions">
+          <button class="action-btn btn-map" onclick="toggleMap('${slug}', ${idx})" id="mapBtn-${slug}">
+            📍 View on Map
+          </button>
+          <a class="action-btn btn-gpx tooltip" ${gpxDisabled}
+            ${route.gpx_url ? `href="${escHtml(route.gpx_url)}" download` : ''}
+            style="${!route.gpx_url ? 'pointer-events:none;opacity:0.5' : ''}">
+            ⬇️ Download GPX
+          </a>
+          ${route.garmin_link ? `<a class="action-btn btn-garmin" href="${escHtml(route.garmin_link)}" target="_blank" rel="noopener noreferrer">🔗 Garmin Connect</a>` : ''}
+          <button class="action-btn btn-share" onclick="shareRoute('${slug}')" title="Copy share link">🔗 Share</button>
+        </div>
+      </div>
+
+      <!-- Map panel (hidden until toggled) -->
+      <div class="map-panel" id="mapPanel-${slug}">
+        <div class="stats-bar" id="statsBar-${slug}">
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">📏</span>
+            <div class="stats-bar-val">${dist}</div>
+            <div class="stats-bar-key">miles</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">⛰</span>
+            <div class="stats-bar-val">${ascent}</div>
+            <div class="stats-bar-key">metres ascent</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">⏱</span>
+            <div class="stats-bar-val">${safe(route.estimated_time).replace(' h ','h ').replace(' min','m') || '—'}</div>
+            <div class="stats-bar-key">ride time</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">☕</span>
+            <div class="stats-bar-val">${safe(route.time_with_coffee).replace(' h ','h ').replace(' min','m') || '—'}</div>
+            <div class="stats-bar-key">w/ coffee</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">🧭</span>
+            <div class="stats-bar-val">${normaliseDir(route.direction) || '—'}</div>
+            <div class="stats-bar-key">direction</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">💨</span>
+            <div class="stats-bar-val">${safeNum(route.recommended_speed_mph) || '—'}</div>
+            <div class="stats-bar-key">rec. mph</div>
+          </div>
+        </div>
+        <div class="map-container" id="map-${slug}"></div>
+        <div class="elevation-wrap">
+          <div class="elevation-label">Elevation Profile</div>
+          <div class="elevation-chart-wrap">
+            <canvas id="elev-${slug}"></canvas>
+          </div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MAP LOGIC
+   ════════════════════════════════════════════════════════════════════ */
+function toggleMap(slug, idx) {
+  const panel = document.getElementById(`mapPanel-${slug}`);
+  const btn   = document.getElementById(`mapBtn-${slug}`);
+  const isOpen = panel.classList.contains('open');
+
+  if (isOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    btn.textContent = '📍 View on Map';
+    delete openMaps[slug];
+  } else {
+    panel.classList.add('open');
+    btn.classList.add('active');
+    btn.textContent = '🗺 Hide Map';
+    openMaps[slug] = true;
+    const route = filteredRoutes[idx];
+    setTimeout(() => initMap(slug, route), 80);
+  }
+}
+
+const leafletMaps = {};
+const elevCharts = {};
+
+function initMap(slug, route) {
+  if (leafletMaps[slug]) {
+    leafletMaps[slug].invalidateSize();
+    return;
+  }
+
+  const mapEl = document.getElementById(`map-${slug}`);
+  if (!mapEl) return;
+
+  const lat = parseFloat(route.start_lat) || SWAVESEY.lat;
+  const lon = parseFloat(route.start_lon) || SWAVESEY.lon;
+
+  const map = L.map(mapEl).setView([lat, lon], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  leafletMaps[slug] = map;
+
+  // Start marker
+  const startIcon = L.divIcon({
+    html: `<div style="background:var(--green);border:3px solid white;border-radius:50%;width:20px;height:20px;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
+    iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+  });
+  L.marker([lat, lon], { icon: startIcon })
+    .addTo(map)
+    .bindPopup(`<b>Start:</b> ${escHtml(safe(route.route_name))} — ${safeNum(route.distance_miles)} miles`);
+
+  // Café marker
+  if (route.cafe_name && route.cafe_maps_url) {
+    const coords = extractCoordsFromMapsUrl(route.cafe_maps_url);
+    if (coords) {
+      const cafeIcon = L.divIcon({
+        html: `<div style="background:var(--orange);border:3px solid white;border-radius:50%;width:18px;height:18px;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px">☕</div>`,
+        iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+      });
+      L.marker(coords, { icon: cafeIcon })
+        .addTo(map)
+        .bindPopup(`<b>${escHtml(route.cafe_name)}</b><br>${escHtml(route.cafe_hours)}`);
+    }
+  }
+
+  // GPX track
+  if (route.gpx_url) {
+    new L.GPX(route.gpx_url, {
+      async: true,
+      marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
+      polyline_options: { color: '#e8621a', weight: 3.5, opacity: 0.9 }
+    }).on('loaded', function(e) {
+      map.fitBounds(e.target.getBounds());
+      buildElevationChart(slug, e.target);
+    }).addTo(map);
+  } else {
+    buildDemoElevationChart(slug, route);
+  }
+
+  map.invalidateSize();
+}
+
+function extractCoordsFromMapsUrl(url) {
+  // Try ?q=lat,lon pattern
+  const match = url.match(/[?&]q=([-\d.]+),([-\d.]+)/);
+  if (match) return [parseFloat(match[1]), parseFloat(match[2])];
+  return null;
+}
+
+function buildElevationChart(slug, gpxLayer) {
+  const canvas = document.getElementById(`elev-${slug}`);
+  if (!canvas) return;
+  // GPX layer elevation data
+  const data = [];
+  gpxLayer.eachLayer(layer => {
+    if (layer.getLatLngs) {
+      const lls = layer.getLatLngs();
+      lls.forEach((ll, i) => { if (ll.alt) data.push(ll.alt); });
+    }
+  });
+  if (data.length === 0) { buildDemoElevationChart(slug); return; }
+  createElevChart(slug, data);
+}
+
+function buildDemoElevationChart(slug, route) {
+  // Generate plausible demo elevation profile
+  const base = 10;
+  const pts = 30;
+  const ascent = parseFloat((route||{}).ascent_metres) || 80;
+  const data = Array.from({length: pts}, (_, i) => {
+    return base + Math.sin(i / pts * Math.PI * 2) * (ascent / 4) + Math.random() * 8;
+  });
+  createElevChart(slug, data);
+}
+
+function createElevChart(slug, data) {
+  if (elevCharts[slug]) elevCharts[slug].destroy();
+  const canvas = document.getElementById(`elev-${slug}`);
+  if (!canvas) return;
+
+  const labels = data.map((_, i) => '');
+  elevCharts[slug] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#e8621a',
+        backgroundColor: 'rgba(232,98,26,0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: {
+          display: true,
+          ticks: { font: { size: 9 }, color: '#8c97a8', maxTicksLimit: 4 },
+          grid: { color: '#eef0f4' }
+        }
+      }
+    }
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SHARE / HASH
+   ════════════════════════════════════════════════════════════════════ */
+function shareRoute(slug) {
+  const url = `${location.origin}${location.pathname}#${slug}`;
+  navigator.clipboard?.writeText(url).then(() => {
+    // Visual feedback
+    const btn = document.querySelector(`#route-${slug} .btn-share`);
+    if (btn) { btn.textContent = '✅ Copied!'; setTimeout(() => { btn.textContent = '🔗 Share'; }, 1800); }
+  }).catch(() => {
+    window.location.hash = slug;
+  });
+  window.location.hash = slug;
+}
+
+function checkHash() {
+  const hash = window.location.hash.replace('#', '');
+  if (!hash) return;
+  const el = document.getElementById(`route-${hash}`);
+  if (el) {
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('pulse');
+      setTimeout(() => el.classList.remove('pulse'), 1400);
+    }, 200);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FILTER CONTROLS
+   ════════════════════════════════════════════════════════════════════ */
+function debouncedFilter() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(applyFilters, 120);
+}
+
+function updateCounts() {
+  const total = allRoutes.length;
+  const shown = filteredRoutes.length;
+  document.getElementById('resultCount').textContent = `${shown} of ${total}`;
+  document.getElementById('hero-total').textContent = total;
+  document.getElementById('hero-road').textContent  = allRoutes.filter(r => safe(r.type).toLowerCase() === 'road').length;
+  const mtbEl = document.getElementById('hero-mtb');
+  if (mtbEl) mtbEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'mtb').length;
+}
+
+function resetFilters() {
+  state.type = 'all';
+  state.distMin = 0; state.distMax = 160;
+  state.ascentMin = 0; state.ascentMax = 2500;
+  state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']);
+  state.cafeOnly = false;
+  state.excludeBusway = false;
+
+  // Reset UI
+  document.getElementById('distMin').value = 0;
+  document.getElementById('distMax').value = 160;
+  document.getElementById('ascentMin').value = 0;
+  document.getElementById('ascentMax').value = 2500;
+  document.getElementById('distMinVal').textContent = '0 mi';
+  document.getElementById('distMaxVal').textContent = '160 mi';
+  document.getElementById('ascentMinVal').textContent = '0 m';
+  document.getElementById('ascentMaxVal').textContent = '2500 m';
+  document.getElementById('cafeToggle').checked = false;
+  document.getElementById('buswayToggle').checked = false;
+  document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
+  document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
+
+  applyFilters();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════════ */
+function initControls() {
+  // Type toggle
+  document.querySelectorAll('#typeToggle .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.type = btn.dataset.val;
+      applyFilters();
+    });
+  });
+
+  // Range sliders
+  ['distMin','distMax','ascentMin','ascentMax'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => {
+      const v = e.target.value;
+      const labelId = id + 'Val';
+      const unit = id.startsWith('dist') ? ' mi' : ' m';
+      document.getElementById(labelId).textContent = v + unit;
+      state[id] = parseInt(v);
+      debouncedFilter();
+    });
+  });
+
+  // Direction checkboxes
+  document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      state.directions = new Set(
+        [...document.querySelectorAll('#dirChecks input:checked')].map(c => c.value)
+      );
+      debouncedFilter();
+    });
+  });
+
+  // Cafe + busway toggles
+  document.getElementById('cafeToggle').addEventListener('change', e => {
+    state.cafeOnly = e.target.checked; applyFilters();
+  });
+  document.getElementById('buswayToggle').addEventListener('change', e => {
+    state.excludeBusway = e.target.checked; applyFilters();
+  });
+
+  // Sort
+  document.getElementById('sortSelect').addEventListener('change', e => {
+    state.sort = e.target.value; applyFilters();
+  });
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('click', resetFilters);
+
+  // Mobile filter toggle
+  document.getElementById('filterToggle').addEventListener('click', () => {
+    const body = document.getElementById('sidebarBody');
+    body.classList.toggle('open');
+  });
+
+  // Hash changes
+  window.addEventListener('hashchange', checkHash);
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   MASTER MAP — single map view of all filtered routes
+   ════════════════════════════════════════════════════════════════════ */
+
+// Swavesey start point — where most routes begin from
+const SWAVESEY = { lat: 52.3553, lon: -0.0170 };
+
+// Compass direction → bearing (degrees clockwise from north)
+const DIR_BEARING = {
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315
+};
+
+// Approximate lat/lon for a route based on direction and distance
+// Uses actual start_lat/start_lon from sheet if available, otherwise
+// estimates a point ~35% of total distance out from Swavesey in the
+// named direction (representing the rough midpoint of the outward leg
+// on a circular route).
+function routeApproxCoords(route) {
+  const lat = parseFloat(route.start_lat);
+  const lon = parseFloat(route.start_lon);
+  if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+    return { lat, lon, exact: true };
+  }
+  // Fallback: estimate from direction + distance
+  const dir   = normaliseDir(route.direction);
+  const bearing = DIR_BEARING[dir] ?? 180; // default south if unknown
+  const dist  = safeNum(route.distance_miles) || 20;
+  const reach = dist * 0.35; // miles to the approximate midpoint
+  const bearingRad = bearing * Math.PI / 180;
+  // Degrees per mile at this latitude
+  const latPerMile = 1 / 69.0;
+  const lonPerMile = 1 / (69.0 * Math.cos(SWAVESEY.lat * Math.PI / 180));
+  return {
+    lat: SWAVESEY.lat + reach * Math.cos(bearingRad) * latPerMile,
+    lon: SWAVESEY.lon + reach * Math.sin(bearingRad) * lonPerMile,
+    exact: false
+  };
+}
+
+// Colour for circle marker — matches card badge colours
+function markerColour(miles) {
+  if (miles < 25)  return '#22a05a'; // green
+  if (miles <= 40) return '#d97706'; // amber
+  return '#dc2626';                  // red
+}
+
+let masterMapInstance = null;
+let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
+let masterGpxLayer    = null;  // GPX track lines — bottom layer, non-interactive
+let currentView = 'list';
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('listPanel').style.display = view === 'list' ? '' : 'none';
+  document.getElementById('masterMapPanel').classList.toggle('active', view === 'map');
+  document.getElementById('tabList').classList.toggle('active', view === 'list');
+  document.getElementById('tabMap').classList.toggle('active', view === 'map');
+  if (view === 'map') refreshMasterMap();
+}
+
+async function refreshMasterMap() {
+  if (currentView !== 'map') return; // don't bother if not visible
+
+  const mapEl = document.getElementById('masterMap');
+
+  // First time: defer map creation until after the container has painted
+  if (!masterMapInstance) {
+    // requestAnimationFrame ensures the browser has rendered the panel
+    // before Leaflet tries to measure it — fixes blank tile issue on mobile
+    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+    masterMapInstance = L.map(mapEl)
+                         .setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+      crossOrigin: true
+    }).addTo(masterMapInstance);
+    // Home marker for Swavesey
+    L.marker([SWAVESEY.lat, SWAVESEY.lon], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:14px;height:14px;background:#1a2e4a;border:3px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+        iconSize: [14, 14], iconAnchor: [7, 7]
+      })
+    }).addTo(masterMapInstance).bindTooltip('🏠 Swavesey HQ', { permanent: false });
+    masterMapInstance.invalidateSize();
+  }
+
+  // Always re-create layers in correct z-order: GPX tracks below, markers above
+  if (masterGpxLayer)    { masterGpxLayer.clearLayers(); }
+  else { masterGpxLayer  = L.layerGroup().addTo(masterMapInstance); }
+  if (masterMarkerLayer) { masterMarkerLayer.clearLayers(); }
+  else { masterMarkerLayer = L.layerGroup().addTo(masterMapInstance); }
+
+  // Layers already set up above — nothing to do here
+
+  if (filteredRoutes.length === 0) {
+    // Zoom back to home if nothing to show
+    masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    return;
+  }
+
+  const bounds = [[SWAVESEY.lat, SWAVESEY.lon]];
+
+  filteredRoutes.forEach((route, idx) => {
+    const coords = routeApproxCoords(route);
+    const dist   = safeNum(route.distance_miles);
+    const colour = markerColour(dist);
+    const slug   = slugify(safe(route.route_name));
+
+    // Radius scales slightly with distance so big routes stand out
+    const radius = 5 + Math.min(dist / 20, 5);
+
+    const marker = L.circleMarker([coords.lat, coords.lon], {
+      radius: Math.max(radius, 10),  // minimum 10px — easier to tap on mobile
+      color: '#ffffff',
+      fillColor: colour,
+      fillOpacity: 0.9,
+      weight: 2,
+      opacity: 1,
+      interactive: true,
+    });
+
+    // Popup content
+    const dir        = normaliseDir(route.direction) || '—';
+    const timeStr    = safe(route.estimated_time) || '—';
+    const ascentStr  = safeNum(route.ascent_metres) ? safeNum(route.ascent_metres) + ' m' : '—';
+    const exactNote  = coords.exact ? '' : '<div style="font-size:0.7rem;color:#999;margin-top:0.3rem">⚠️ Approximate position</div>';
+
+    marker.bindPopup(`
+      <div class="map-route-popup">
+        <div class="pop-name">${escHtml(safe(route.route_name))}</div>
+        <div class="pop-stats">
+          <span>📏 ${dist} mi</span>
+          <span>⛰ ${ascentStr}</span>
+          <span>⏱ ${timeStr}</span>
+          <span>🧭 ${dir}</span>
+        </div>
+        ${safe(route.garmin_link) ? `<a href="${escHtml(safe(route.garmin_link))}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;margin-bottom:0.4rem;font-size:0.75rem;color:#e8621a">Open in Garmin Connect ↗</a>` : ''}
+        <button class="pop-btn" onclick="window.scrollToCard('${slug}')">
+          View full details →
+        </button>
+        ${exactNote}
+      </div>`, { maxWidth: 240 });
+
+    marker.bindTooltip(escHtml(safe(route.route_name)), { sticky: true });
+    // Explicit click handler — more reliable than popup onclick across browsers
+    marker.on('click', () => marker.openPopup());
+    marker.addTo(masterMarkerLayer);
+    bounds.push([coords.lat, coords.lon]);
+
+    // If this route has a GPX file, draw the track on the master map
+    // Rotate through a palette so overlapping tracks are distinguishable
+    const GPX_PALETTE = [
+      '#e8621a', // orange
+      '#2563eb', // blue
+      '#16a34a', // green
+      '#9333ea', // purple
+      '#dc2626', // red
+      '#0891b2', // cyan
+      '#d97706', // amber
+      '#be185d', // pink
+      '#059669', // emerald
+      '#7c3aed', // violet
+    ];
+    const gpxColour = GPX_PALETTE[idx % GPX_PALETTE.length];
+
+    if (safe(route.gpx_url)) {
+      new L.GPX(safe(route.gpx_url), {
+        async: true,
+        interactive: false,
+        polyline_options: {
+          color: gpxColour,
+          opacity: 0.7,
+          weight: 4,
+          interactive: false
+        },
+        marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null }
+      }).on('loaded', function(e) {
+        // Add to the BOTTOM layer so circle markers always sit on top and receive clicks
+        masterGpxLayer.addLayer(e.target);
+        // Expand bounds to include the full track
+        const gpxBounds = e.target.getBounds();
+        if (gpxBounds.isValid()) masterMapInstance.fitBounds(gpxBounds.extend(bounds), { padding: [40,40], maxZoom: 12 });
+      }).on('error', function() {
+        // GPX load failed silently — marker still shows
+      });
+    }
+  });
+
+  // Fit map to show all markers with padding
+  masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+
+  // Invalidate size in case the panel just became visible
+  masterMapInstance.invalidateSize(true); // force tile reload after fitBounds
+}
+
+function scrollToCard(slug) {
+  // Switch to list view first, then scroll after a beat
+  switchView('list');
+  setTimeout(() => {
+    const el = document.getElementById('route-' + slug);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.add('highlighted');
+    setTimeout(() => el.classList.remove('highlighted'), 2000);
+  }, 120);
+}
+
+// Expose on window so Leaflet popup onclick strings can reach them
+window.scrollToCard = scrollToCard;
+window.switchView   = switchView;
+
+async function init() {
+  initControls();
+  // Show debug panel only if flag is set
+  if (CONFIG.SHOW_DEBUG) {
+    const dp = document.getElementById('debugPanel');
+    if (dp) dp.style.display = '';
+  }
+  dbg('App initialising...');
+  try {
+    allRoutes = await fetchRoutes();
+    dbg(`init complete — ${allRoutes.length} routes loaded`, allRoutes.length > 0);
+    applyFilters();
+  } catch (err) {
+    dbg(`init failed: ${err.message}`, false);
+    console.error('Failed to load routes:', err);
+    document.getElementById('routesGrid').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Couldn't load routes</h3>
+        <p>Check the debug panel above for details.</p>
+      </div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
