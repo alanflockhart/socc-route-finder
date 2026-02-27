@@ -1831,7 +1831,7 @@ function initMap(slug, route) {
   if (route.gpx_url) {
     new L.GPX(route.gpx_url, {
       async: true,
-      marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
+      marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '', wptIconUrls: { '': '' } },
       polyline_options: { color: '#e8621a', weight: 3.5, opacity: 0.9 }
     }).on('loaded', function(e) {
       map.fitBounds(e.target.getBounds());
@@ -2298,7 +2298,7 @@ async function refreshMasterMap() {
           opacity: 0.7,
           weight: 4,
         },
-        marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null }
+        marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '', wptIconUrls: { '': '' } }
       }).on('loaded', function(e) {
         // Bind popup and hover effects to every polyline sublayer
         const popupHtml = buildRoutePopupHtml(route, slug);
