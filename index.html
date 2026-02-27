@@ -1816,8 +1816,9 @@ function addCafesToMap(map, fontSize) {
     const lon = parseFloat(cafe.lon);
     if (isNaN(lat) || isNaN(lon)) return;
     if (!bounds.contains([lat, lon])) return;
+    const baconSz = Math.round(fontSize * 0.45);
     const cafeIcon = L.divIcon({
-      html: `<div style="font-size:${fontSize}px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">🍳</div>`,
+      html: `<div style="position:relative;display:inline-block;font-size:${fontSize}px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">🍳<span style="position:absolute;font-size:${baconSz}px;top:${Math.round(fontSize*0.15)}px;left:${Math.round(fontSize*0.38)}px;transform:rotate(-20deg)">🥓</span></div>`,
       iconSize: [fontSize, fontSize], iconAnchor: [fontSize/2, fontSize], className: ''
     });
     const name = escHtml(safe(cafe.cafe_name));
@@ -2219,7 +2220,7 @@ async function refreshMasterMap() {
       if (isNaN(lat) || isNaN(lon)) return;
 
       const cafeIcon = L.divIcon({
-        html: '<div style="font-size:30px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">🍳</div>',
+        html: '<div style="position:relative;display:inline-block;font-size:30px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">🍳<span style="position:absolute;font-size:13px;top:5px;left:11px;transform:rotate(-20deg)">🥓</span></div>',
         iconSize: [30, 30], iconAnchor: [15, 30], className: ''
       });
       const name = escHtml(safe(cafe.cafe_name));
