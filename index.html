@@ -455,6 +455,12 @@
     .route-card:target, .route-card.highlighted {
       border-color: var(--orange);
       box-shadow: 0 0 0 3px var(--orange-dim), var(--shadow);
+      animation: cardPulse 0.6s ease-out;
+    }
+    @keyframes cardPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(232,98,26,0.5); }
+      50%  { box-shadow: 0 0 0 8px rgba(232,98,26,0.2); }
+      100% { box-shadow: 0 0 0 3px var(--orange-dim), var(--shadow); }
     }
 
     .card-main { padding: 1.1rem 1.25rem 1rem; }
@@ -1229,10 +1235,6 @@ const state = {
 const CACHE_KEY = 'socc_routes_cache';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
 
-// DEBUG: force clear cache on every load so column mapping changes take effect immediately
-// Remove this line once routes are displaying correctly
-localStorage.removeItem(CACHE_KEY);
-
 function dbg(msg, ok) {
   if (!CONFIG.SHOW_DEBUG) return;
   console.log('SOCC DEBUG:', msg);
@@ -1758,6 +1760,12 @@ function initMap(slug, route) {
     }).on('loaded', function(e) {
       map.fitBounds(e.target.getBounds());
       buildElevationChart(slug, e.target);
+      e.target.eachLayer(function(layer) {
+        if (layer.setStyle) {
+          layer.on('mouseover', function() { this.setStyle({ weight: 5, opacity: 1.0 }); });
+          layer.on('mouseout', function() { this.setStyle({ weight: 3.5, opacity: 0.9 }); });
+        }
+      });
     }).addTo(map);
   } else {
     buildDemoElevationChart(slug, route);
@@ -2016,7 +2024,7 @@ function markerColour(miles) {
 
 let masterMapInstance = null;
 let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
-let masterGpxLayer    = null;  // GPX track lines — bottom layer, non-interactive
+let masterGpxLayer    = null;  // GPX track lines — bottom layer, interactive with popup + hover
 let currentView = 'list';
 
 function switchView(view) {
@@ -2026,6 +2034,31 @@ function switchView(view) {
   document.getElementById('tabList').classList.toggle('active', view === 'list');
   document.getElementById('tabMap').classList.toggle('active', view === 'map');
   if (view === 'map') refreshMasterMap();
+}
+
+function buildRoutePopupHtml(route, slug) {
+  const dist      = safeNum(route.distance_miles);
+  const dir       = normaliseDir(route.direction) || '\u2014';
+  const timeStr   = safe(route.estimated_time) || '\u2014';
+  const ascentStr = safeNum(route.ascent_metres) ? safeNum(route.ascent_metres) + ' m' : '\u2014';
+  const coords    = routeApproxCoords(route);
+  const exactNote = coords.exact ? '' : '<div style="font-size:0.7rem;color:#999;margin-top:0.3rem">\u26a0\ufe0f Approximate position</div>';
+
+  return `
+    <div class="map-route-popup">
+      <div class="pop-name">${escHtml(safe(route.route_name))}</div>
+      <div class="pop-stats">
+        <span>\ud83d\udccf ${dist} mi</span>
+        <span>\u26f0 ${ascentStr}</span>
+        <span>\u23f1 ${timeStr}</span>
+        <span>\ud83e\udded ${dir}</span>
+      </div>
+      ${safe(route.garmin_link) ? `<a href="${escHtml(safe(route.garmin_link))}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;margin-bottom:0.4rem;font-size:0.75rem;color:#e8621a">Open in Garmin Connect \u2197</a>` : ''}
+      <button class="pop-btn" onclick="window.scrollToCard('${slug}')">
+        View full details \u2192
+      </button>
+      ${exactNote}
+    </div>`;
 }
 
 async function refreshMasterMap() {
@@ -2091,27 +2124,7 @@ async function refreshMasterMap() {
       interactive: true,
     });
 
-    // Popup content
-    const dir        = normaliseDir(route.direction) || '—';
-    const timeStr    = safe(route.estimated_time) || '—';
-    const ascentStr  = safeNum(route.ascent_metres) ? safeNum(route.ascent_metres) + ' m' : '—';
-    const exactNote  = coords.exact ? '' : '<div style="font-size:0.7rem;color:#999;margin-top:0.3rem">⚠️ Approximate position</div>';
-
-    marker.bindPopup(`
-      <div class="map-route-popup">
-        <div class="pop-name">${escHtml(safe(route.route_name))}</div>
-        <div class="pop-stats">
-          <span>📏 ${dist} mi</span>
-          <span>⛰ ${ascentStr}</span>
-          <span>⏱ ${timeStr}</span>
-          <span>🧭 ${dir}</span>
-        </div>
-        ${safe(route.garmin_link) ? `<a href="${escHtml(safe(route.garmin_link))}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;margin-bottom:0.4rem;font-size:0.75rem;color:#e8621a">Open in Garmin Connect ↗</a>` : ''}
-        <button class="pop-btn" onclick="window.scrollToCard('${slug}')">
-          View full details →
-        </button>
-        ${exactNote}
-      </div>`, { maxWidth: 240 });
+    marker.bindPopup(buildRoutePopupHtml(route, slug), { maxWidth: 240 });
 
     marker.bindTooltip(escHtml(safe(route.route_name)), { sticky: true });
     // Explicit click handler — more reliable than popup onclick across browsers
@@ -2138,16 +2151,31 @@ async function refreshMasterMap() {
     if (safe(route.gpx_url)) {
       new L.GPX(safe(route.gpx_url), {
         async: true,
-        interactive: false,
         polyline_options: {
           color: gpxColour,
           opacity: 0.7,
           weight: 4,
-          interactive: false
         },
         marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null }
       }).on('loaded', function(e) {
-        // Add to the BOTTOM layer so circle markers always sit on top and receive clicks
+        // Bind popup and hover effects to every polyline sublayer
+        const popupHtml = buildRoutePopupHtml(route, slug);
+        e.target.eachLayer(function(layer) {
+          if (layer.bindPopup) {
+            layer.bindPopup(popupHtml, { maxWidth: 240 });
+          }
+          if (layer.setStyle) {
+            layer.on('mouseover', function() {
+              this.setStyle({ weight: 7, opacity: 1.0 });
+            });
+            layer.on('mouseout', function() {
+              this.setStyle({ weight: 4, opacity: 0.7 });
+            });
+          }
+        });
+        e.target.bindTooltip(escHtml(safe(route.route_name)), { sticky: true });
+
+        // Add to the BOTTOM layer so circle markers always sit on top and receive clicks first
         masterGpxLayer.addLayer(e.target);
         // Expand bounds to include the full track
         const gpxBounds = e.target.getBounds();
@@ -2171,9 +2199,9 @@ function scrollToCard(slug) {
   setTimeout(() => {
     const el = document.getElementById('route-' + slug);
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.add('highlighted');
-    setTimeout(() => el.classList.remove('highlighted'), 2000);
+    setTimeout(() => el.classList.remove('highlighted'), 3000);
   }, 120);
 }
 
