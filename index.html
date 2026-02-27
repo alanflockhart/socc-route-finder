@@ -1784,6 +1784,50 @@ function toggleMap(slug, idx) {
 const leafletMaps = {};
 const elevCharts = {};
 
+/* ── Shared café helpers (used by master map + card maps) ── */
+function buildCafePopupHtml(cafe) {
+  const name    = escHtml(safe(cafe.cafe_name));
+  const village = escHtml(safe(cafe.village));
+  const rating  = cafe.rating ? '⭐'.repeat(Math.min(parseInt(cafe.rating) || 0, 5)) : '';
+  const satHrs  = safe(cafe.saturday_hours);
+  const sunHrs  = safe(cafe.sunday_hours);
+  const hours   = (satHrs || sunHrs)
+    ? `<div style="font-size:0.75rem;margin-top:0.3rem">` +
+      (satHrs ? `<div>Sat: ${escHtml(satHrs)}</div>` : '') +
+      (sunHrs ? `<div>Sun: ${escHtml(sunHrs)}</div>` : '') +
+      `</div>` : '';
+  const notes   = safe(cafe.notes) ? `<div style="font-size:0.7rem;color:#666;margin-top:0.2rem">${escHtml(cafe.notes)}</div>` : '';
+  const website = safe(cafe.website)
+    ? `<a href="${escHtml(cafe.website)}" target="_blank" rel="noopener noreferrer" style="display:block;font-size:0.7rem;color:#e8621a;margin-top:0.2rem">Visit website ↗</a>` : '';
+  return `
+    <div style="min-width:140px">
+      <div style="font-weight:700;font-size:0.85rem">🍳 ${name}</div>
+      ${village ? `<div style="font-size:0.75rem;color:#555">${village}</div>` : ''}
+      ${rating ? `<div style="font-size:0.8rem">${rating}</div>` : ''}
+      ${hours}${notes}${website}
+    </div>`;
+}
+
+function addCafesToMap(map, fontSize) {
+  if (!allCafes || allCafes.length === 0) return;
+  const bounds = map.getBounds();
+  allCafes.forEach(cafe => {
+    const lat = parseFloat(cafe.lat);
+    const lon = parseFloat(cafe.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    if (!bounds.contains([lat, lon])) return;
+    const cafeIcon = L.divIcon({
+      html: `<div style="font-size:${fontSize}px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">🍳</div>`,
+      iconSize: [fontSize, fontSize], iconAnchor: [fontSize/2, fontSize], className: ''
+    });
+    const name = escHtml(safe(cafe.cafe_name));
+    L.marker([lat, lon], { icon: cafeIcon })
+      .addTo(map)
+      .bindPopup(buildCafePopupHtml(cafe), { maxWidth: 220 })
+      .bindTooltip(`🍳 ${name}`, { sticky: true });
+  });
+}
+
 function initMap(slug, route) {
   if (leafletMaps[slug]) {
     leafletMaps[slug].invalidateSize();
@@ -1813,20 +1857,6 @@ function initMap(slug, route) {
     .addTo(map)
     .bindPopup(`<b>Start:</b> ${escHtml(safe(route.route_name))} — ${safeNum(route.distance_miles)} miles`);
 
-  // Café marker
-  if (route.cafe_name && route.cafe_maps_url) {
-    const coords = extractCoordsFromMapsUrl(route.cafe_maps_url);
-    if (coords) {
-      const cafeIcon = L.divIcon({
-        html: '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">🍳</div>',
-        iconSize: [22, 22], iconAnchor: [11, 22], className: ''
-      });
-      L.marker(coords, { icon: cafeIcon })
-        .addTo(map)
-        .bindPopup(`<b>${escHtml(route.cafe_name)}</b><br>${escHtml(route.cafe_hours)}`);
-    }
-  }
-
   // GPX track
   if (route.gpx_url) {
     new L.GPX(route.gpx_url, {
@@ -1836,6 +1866,8 @@ function initMap(slug, route) {
     }).on('loaded', function(e) {
       map.fitBounds(e.target.getBounds());
       buildElevationChart(slug, e.target);
+      // Add café markers once the map settles to the new bounds
+      map.once('moveend', function() { addCafesToMap(map, 22); });
       e.target.eachLayer(function(layer) {
         if (layer.setStyle) {
           layer.on('mouseover', function() { this.setStyle({ weight: 5, opacity: 1.0 }); });
@@ -1848,13 +1880,6 @@ function initMap(slug, route) {
   }
 
   map.invalidateSize();
-}
-
-function extractCoordsFromMapsUrl(url) {
-  // Try ?q=lat,lon pattern
-  const match = url.match(/[?&]q=([-\d.]+),([-\d.]+)/);
-  if (match) return [parseFloat(match[1]), parseFloat(match[2])];
-  return null;
 }
 
 function buildElevationChart(slug, gpxLayer) {
@@ -2197,32 +2222,10 @@ async function refreshMasterMap() {
         html: '<div style="font-size:30px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">🍳</div>',
         iconSize: [30, 30], iconAnchor: [15, 30], className: ''
       });
-
-      const name    = escHtml(safe(cafe.cafe_name));
-      const village = escHtml(safe(cafe.village));
-      const rating  = cafe.rating ? '⭐'.repeat(Math.min(parseInt(cafe.rating) || 0, 5)) : '';
-      const satHrs  = safe(cafe.saturday_hours);
-      const sunHrs  = safe(cafe.sunday_hours);
-      const hours   = (satHrs || sunHrs)
-        ? `<div style="font-size:0.75rem;margin-top:0.3rem">` +
-          (satHrs ? `<div>Sat: ${escHtml(satHrs)}</div>` : '') +
-          (sunHrs ? `<div>Sun: ${escHtml(sunHrs)}</div>` : '') +
-          `</div>` : '';
-      const notes   = safe(cafe.notes) ? `<div style="font-size:0.7rem;color:#666;margin-top:0.2rem">${escHtml(cafe.notes)}</div>` : '';
-      const website = safe(cafe.website)
-        ? `<a href="${escHtml(cafe.website)}" target="_blank" rel="noopener noreferrer" style="display:block;font-size:0.7rem;color:#e8621a;margin-top:0.2rem">Visit website ↗</a>` : '';
-
-      const popupHtml = `
-        <div style="min-width:140px">
-          <div style="font-weight:700;font-size:0.85rem">🍳 ${name}</div>
-          ${village ? `<div style="font-size:0.75rem;color:#555">${village}</div>` : ''}
-          ${rating ? `<div style="font-size:0.8rem">${rating}</div>` : ''}
-          ${hours}${notes}${website}
-        </div>`;
-
+      const name = escHtml(safe(cafe.cafe_name));
       L.marker([lat, lon], { icon: cafeIcon })
         .addTo(masterCafeLayer)
-        .bindPopup(popupHtml, { maxWidth: 220 })
+        .bindPopup(buildCafePopupHtml(cafe), { maxWidth: 220 })
         .bindTooltip(`🍳 ${name}`, { sticky: true });
     });
   }
