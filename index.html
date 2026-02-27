@@ -960,7 +960,7 @@
         <div class="filter-group">
           <span class="filter-label">Options</span>
           <div class="switch-row">
-            <span class="switch-label">☕ Café stop only</span>
+            <span class="switch-label">☕ Show cafés on map</span>
             <label class="switch">
               <input type="checkbox" id="cafeToggle">
               <span class="switch-track"></span>
@@ -1045,6 +1045,7 @@ const CONFIG = {
   SHEET_ID:      '2PACX-1vQflvwcr6Nf1NVyvv45Jt7YWF3fxZO0ecaN8JwMYU4gQeghoYR7eLmkGS7zfSqdlA8VuiIhkQ4eCAYz',
   SHEET_NAME:    'Routes',
   SHEET_GID:     '429694098',
+  CAFES_GID:     '2092417686',           // Cafes tab
   USE_DEMO_DATA: false,
   SHOW_DEBUG:    false,          // true = show debug panel; false = hidden
 
@@ -1070,6 +1071,20 @@ const CONFIG = {
     'comparison':                     'comparison',
     'start_lat':                      'start_lat',
     'start_long':                     'start_lon',      // CSV header is 'start_long'
+  },
+
+  // Maps Cafes tab column headers → internal field names
+  CAFE_COLUMN_MAP: {
+    'n1':                    'route_ref',
+    'village':               'village',
+    'name':                  'cafe_name',
+    'rating':                'rating',
+    'notes':                 'notes',
+    'saturday':              'saturday_hours',
+    'sunday opening time':   'sunday_hours',
+    'lat':                   'lat',
+    'long':                  'lon',
+    'website':               'website',
   },
 };
 
@@ -1215,11 +1230,18 @@ const DEMO_ROUTES = [
   },
 ];
 
+const DEMO_CAFES = [
+  { route_ref: "5 Miles from Anywhere (58)", village: "upware", cafe_name: "5 Miles from Anywhere", rating: "", notes: "", saturday_hours: "11:00", sunday_hours: "11:00", lat: 52.307786, lon: 0.252429, website: "http://www.fivemilesinn.com/" },
+  { route_ref: "Amor Cafe-Hardwick", village: "Hardwick", cafe_name: "Amor", rating: 4, notes: "", saturday_hours: "09:00", sunday_hours: "09:00", lat: 52.217456, lon: 0.01047, website: "https://amorcoffeecompany.co.uk/" },
+  { route_ref: "Ambience Cafe (50)", village: "St Neots", cafe_name: "Ambience", rating: "", notes: "", saturday_hours: "09:00", sunday_hours: "09:00", lat: 52.226005, lon: -0.274664, website: "http://www.ambiancecafe.co.uk/" },
+];
+
 /* ════════════════════════════════════════════════════════════════════
    STATE
    ════════════════════════════════════════════════════════════════════ */
 let allRoutes = [];
 let filteredRoutes = [];
+let allCafes = [];
 let openMaps = {};   // cardId → leaflet map instance
 let filterTimer = null;
 
@@ -1237,6 +1259,7 @@ const state = {
    DATA FETCHING — with localStorage cache (1 hour TTL)
    ════════════════════════════════════════════════════════════════════ */
 const CACHE_KEY = 'socc_routes_cache';
+const CAFES_CACHE_KEY = 'socc_cafes_cache';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
 
 function dbg(msg, ok) {
@@ -1362,8 +1385,54 @@ async function fetchRoutes() {
   return data;
 }
 
+async function fetchCafes() {
+  if (CONFIG.USE_DEMO_DATA) {
+    dbg(`Demo mode — returning ${DEMO_CAFES.length} cafes`, true);
+    return DEMO_CAFES;
+  }
+
+  // Return cached data if still fresh
+  try {
+    const cached = JSON.parse(localStorage.getItem(CAFES_CACHE_KEY));
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      dbg(`Cafes cache hit — ${cached.data.length} cafes`, true);
+      return cached.data;
+    }
+  } catch(e) { /* ignore */ }
+
+  const url = `https://docs.google.com/spreadsheets/d/e/${CONFIG.SHEET_ID}/pub?gid=${CONFIG.CAFES_GID}&single=true&output=csv`;
+  dbg(`Fetching cafes: ${url.slice(0,80)}...`);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const csv = await res.text();
+    if (csv.length < 10 || csv.toLowerCase().includes('<html')) {
+      throw new Error('Invalid CSV response for cafes');
+    }
+    const parsed = parseCSV(csv, CONFIG.CAFE_COLUMN_MAP);
+    // Only keep cafes with valid coordinates
+    const data = parsed.filter(c => {
+      const lat = parseFloat(c.lat);
+      const lon = parseFloat(c.lon);
+      return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+    });
+    dbg(`Cafes parsed — ${parsed.length} total, ${data.length} with coordinates`, data.length > 0);
+
+    try {
+      localStorage.setItem(CAFES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
+    } catch(e) { /* storage full — non-fatal */ }
+
+    return data;
+  } catch(e) {
+    dbg(`Cafes fetch failed: ${e.message}`, false);
+    return []; // non-fatal — app works without cafes
+  }
+}
+
 function clearCache() {
   localStorage.removeItem(CACHE_KEY);
+  localStorage.removeItem(CAFES_CACHE_KEY);
   location.reload();
 }
 
@@ -1374,14 +1443,15 @@ function showCacheAge(timestamp) {
   el.textContent = mins < 1 ? 'Data: just refreshed' : `Data: ${mins} min${mins > 1 ? 's' : ''} ago`;
 }
 
-function parseCSV(csv) {
+function parseCSV(csv, columnMap) {
+  const colMap = columnMap || CONFIG.COLUMN_MAP;
   const lines = csv.trim().split('\n');
   const rawHeaders = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
 
-  // Normalise headers using COLUMN_MAP (case-insensitive lookup)
+  // Normalise headers using column map (case-insensitive lookup)
   const headers = rawHeaders.map(h => {
     const key = h.toLowerCase();
-    return CONFIG.COLUMN_MAP[key] || h; // mapped name, or original if not in map
+    return colMap[key] || h; // mapped name, or original if not in map
   });
 
   return lines.slice(1).map(line => {
@@ -1455,8 +1525,8 @@ function applyFilters() {
     const dir = normaliseDir(r.direction);
     if (dir && !state.directions.has(dir)) return false;
 
-    // cafe
-    if (state.cafeOnly && !r.cafe_name) return false;
+    // cafe toggle — controls map café markers only (see refreshMasterMap)
+    // Route data doesn't carry café fields; Cafes tab is a separate dataset
 
     // busway
     if (state.excludeBusway && r.busway_segment === true) return false;
@@ -1987,7 +2057,7 @@ function initControls() {
    ════════════════════════════════════════════════════════════════════ */
 
 // Swavesey start point — where most routes begin from
-const SWAVESEY = { lat: 52.3553, lon: -0.0170 };
+const SWAVESEY = { lat: 52.3063, lon: -0.0004 };  // Swavesey Busway stop
 
 // Compass direction → bearing (degrees clockwise from north)
 const DIR_BEARING = {
@@ -2030,6 +2100,7 @@ function markerColour(miles) {
 
 let masterMapInstance = null;
 let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
+let masterCafeLayer   = null;  // café markers — middle layer
 let masterGpxLayer    = null;  // GPX track lines — bottom layer, interactive with popup + hover
 let currentView = 'list';
 
@@ -2095,13 +2166,54 @@ async function refreshMasterMap() {
     masterMapInstance.invalidateSize();
   }
 
-  // Always re-create layers in correct z-order: GPX tracks below, markers above
+  // Always re-create layers in correct z-order: GPX (bottom), cafés (middle), route markers (top)
   if (masterGpxLayer)    { masterGpxLayer.clearLayers(); }
   else { masterGpxLayer  = L.layerGroup().addTo(masterMapInstance); }
+  if (masterCafeLayer)   { masterCafeLayer.clearLayers(); }
+  else { masterCafeLayer = L.layerGroup().addTo(masterMapInstance); }
   if (masterMarkerLayer) { masterMarkerLayer.clearLayers(); }
   else { masterMarkerLayer = L.layerGroup().addTo(masterMapInstance); }
 
-  // Layers already set up above — nothing to do here
+  // Plot café markers when toggle is ON
+  if (state.cafeOnly && allCafes.length > 0) {
+    allCafes.forEach(cafe => {
+      const lat = parseFloat(cafe.lat);
+      const lon = parseFloat(cafe.lon);
+      if (isNaN(lat) || isNaN(lon)) return;
+
+      const cafeIcon = L.divIcon({
+        html: '<div style="background:var(--orange);border:3px solid white;border-radius:50%;width:24px;height:24px;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:13px">☕</div>',
+        iconSize: [24, 24], iconAnchor: [12, 12], className: ''
+      });
+
+      const name    = escHtml(safe(cafe.cafe_name));
+      const village = escHtml(safe(cafe.village));
+      const rating  = cafe.rating ? '⭐'.repeat(Math.min(parseInt(cafe.rating) || 0, 5)) : '';
+      const satHrs  = safe(cafe.saturday_hours);
+      const sunHrs  = safe(cafe.sunday_hours);
+      const hours   = (satHrs || sunHrs)
+        ? `<div style="font-size:0.75rem;margin-top:0.3rem">` +
+          (satHrs ? `<div>Sat: ${escHtml(satHrs)}</div>` : '') +
+          (sunHrs ? `<div>Sun: ${escHtml(sunHrs)}</div>` : '') +
+          `</div>` : '';
+      const notes   = safe(cafe.notes) ? `<div style="font-size:0.7rem;color:#666;margin-top:0.2rem">${escHtml(cafe.notes)}</div>` : '';
+      const website = safe(cafe.website)
+        ? `<a href="${escHtml(cafe.website)}" target="_blank" rel="noopener noreferrer" style="display:block;font-size:0.7rem;color:#e8621a;margin-top:0.2rem">Visit website ↗</a>` : '';
+
+      const popupHtml = `
+        <div style="min-width:140px">
+          <div style="font-weight:700;font-size:0.85rem">☕ ${name}</div>
+          ${village ? `<div style="font-size:0.75rem;color:#555">${village}</div>` : ''}
+          ${rating ? `<div style="font-size:0.8rem">${rating}</div>` : ''}
+          ${hours}${notes}${website}
+        </div>`;
+
+      L.marker([lat, lon], { icon: cafeIcon })
+        .addTo(masterCafeLayer)
+        .bindPopup(popupHtml, { maxWidth: 220 })
+        .bindTooltip(`☕ ${name}`, { sticky: true });
+    });
+  }
 
   if (filteredRoutes.length === 0) {
     // Zoom back to home if nothing to show
@@ -2228,7 +2340,8 @@ async function init() {
   dbg('App initialising...');
   try {
     allRoutes = await fetchRoutes();
-    dbg(`init complete — ${allRoutes.length} routes loaded`, allRoutes.length > 0);
+    allCafes  = await fetchCafes();
+    dbg(`init complete — ${allRoutes.length} routes, ${allCafes.length} cafes loaded`, allRoutes.length > 0);
     applyFilters();
   } catch (err) {
     dbg(`init failed: ${err.message}`, false);
