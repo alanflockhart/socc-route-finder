@@ -1046,7 +1046,7 @@ const CONFIG = {
 
   // Maps your actual sheet column headers → internal app field names (all lowercase keys)
   COLUMN_MAP: {
-    '':                               'type',           // unnamed 3rd column contains Road/MTB
+    'type':                            'type',           // 3rd column: Road/MTB
     'ridable':                        'rideable',
     'route name':                     'route_name',
     'distance miles':                 'distance_miles',
@@ -1065,7 +1065,7 @@ const CONFIG = {
     'source':                         'source',
     'comparison':                     'comparison',
     'start_lat':                      'start_lat',
-    'start_lon':                      'start_lon',
+    'start_long':                     'start_lon',      // CSV header is 'start_long'
   },
 };
 
