@@ -960,8 +960,8 @@
         <div class="filter-group">
           <span class="filter-label">Map display</span>
           <div class="toggle-group" id="mapDisplayToggle">
-            <button class="toggle-btn" data-val="all">All</button>
-            <button class="toggle-btn active" data-val="routes">🚴 Routes</button>
+            <button class="toggle-btn active" data-val="all">All</button>
+            <button class="toggle-btn" data-val="routes">🚴 Routes</button>
             <button class="toggle-btn" data-val="cafes">🍳 Cafés</button>
           </div>
         </div>
@@ -1253,7 +1253,7 @@ const state = {
   distMin: 0, distMax: 160,
   ascentMin: 0, ascentMax: 2500,
   directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
-  mapDisplay: 'routes',  // 'routes' | 'all' | 'cafes'
+  mapDisplay: 'all',  // 'routes' | 'all' | 'cafes'
   excludeBusway: false,
   sort: 'name',
 };
@@ -1996,7 +1996,7 @@ function resetFilters() {
   state.distMin = 0; state.distMax = 160;
   state.ascentMin = 0; state.ascentMax = 2500;
   state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']);
-  state.mapDisplay = 'routes';
+  state.mapDisplay = 'all';
   state.excludeBusway = false;
 
   // Reset UI
@@ -2011,7 +2011,7 @@ function resetFilters() {
   document.getElementById('buswayToggle').checked = false;
   document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
-  document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'routes'));
+  document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
 
   applyFilters();
 }
