@@ -2166,9 +2166,13 @@ async function refreshMasterMap() {
       }).on('loaded', function(e) {
         // Bind popup and hover effects to every polyline sublayer
         const popupHtml = buildRoutePopupHtml(route, slug);
+        const routeLabel = escHtml(safe(route.route_name));
         e.target.eachLayer(function(layer) {
           if (layer.bindPopup) {
             layer.bindPopup(popupHtml, { maxWidth: 240 });
+          }
+          if (layer.bindTooltip) {
+            layer.bindTooltip(routeLabel, { sticky: true });
           }
           if (layer.setStyle) {
             layer.on('mouseover', function() {
@@ -2179,7 +2183,6 @@ async function refreshMasterMap() {
             });
           }
         });
-        e.target.bindTooltip(escHtml(safe(route.route_name)), { sticky: true });
 
         // Add to the BOTTOM layer so circle markers always sit on top and receive clicks first
         masterGpxLayer.addLayer(e.target);
