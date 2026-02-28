@@ -5,46 +5,74 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SOCC Route Finder — Swavesey & Over Cycling Club</title>
 
+  <!-- Google Fonts — Inter for clean modern typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 
   <style>
     /* ─── DESIGN TOKENS ─────────────────────────────────────────── */
     :root {
-      --navy:       #1a2e4a;
-      --navy-light: #243d62;
-      --navy-dark:  #111e30;
-      --orange:     #e8621a;
-      --orange-light: #f0824a;
-      --orange-dim: rgba(232,98,26,0.12);
+      /* SOCC Brand Palette */
+      --dark:       #1B2631;
+      --dark-light: #243447;
+      --dark-deep:  #111B24;
+      --teal:       #2CBCB3;
+      --teal-light: #45D4CB;
+      --teal-dark:  #1A9E96;
+      --teal-dim:   rgba(44,188,179,0.10);
+      --teal-glow:  rgba(44,188,179,0.25);
+
+      /* Legacy aliases (so existing JS references still work) */
+      --navy:       var(--dark);
+      --navy-light: var(--dark-light);
+      --navy-dark:  var(--dark-deep);
+      --orange:     var(--teal);
+      --orange-light: var(--teal-light);
+      --orange-dim: var(--teal-dim);
+
+      /* Neutrals */
       --white:      #ffffff;
-      --grey-50:    #f7f8fa;
-      --grey-100:   #eef0f4;
-      --grey-200:   #dce0e8;
+      --grey-50:    #f7f9fa;
+      --grey-100:   #eef1f5;
+      --grey-200:   #dce1e9;
       --grey-400:   #8c97a8;
       --grey-600:   #4e5d6e;
       --grey-800:   #2a3440;
-      --green:      #1db87a;
-      --amber:      #f0a500;
-      --red:        #e03636;
-      --teal:       #1ab8b8;
-      --blue:       #1a72d4;
-      --purple:     #8b54d6;
 
-      --font-main: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      /* Semantic */
+      --green:      #10b981;
+      --amber:      #f59e0b;
+      --red:        #ef4444;
+      --blue:       #3b82f6;
+      --purple:     #8b5cf6;
 
-      --radius:     10px;
-      --radius-sm:  6px;
-      --shadow-sm:  0 1px 4px rgba(0,0,0,.08);
-      --shadow:     0 4px 16px rgba(0,0,0,.12);
-      --shadow-lg:  0 8px 32px rgba(0,0,0,.18);
+      /* Surfaces */
+      --surface:    #ffffff;
+      --surface-elevated: #f8fffe;
+
+      /* Typography */
+      --font-main:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --font-mono:  'SF Mono', 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+
+      /* Layout */
+      --radius:     12px;
+      --radius-sm:  8px;
+      --radius-xs:  4px;
+      --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --shadow:     0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+      --shadow-lg:  0 10px 30px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06);
+      --shadow-teal: 0 4px 16px rgba(44,188,179,0.20);
       --transition: 0.2s ease;
+      --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* ─── RESET ─────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: 16px; scroll-behavior: smooth; }
+    html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--font-main);
       background: var(--grey-50);
@@ -52,6 +80,9 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.5;
     }
     a { color: inherit; text-decoration: none; }
     button { cursor: pointer; font-family: inherit; border: none; background: none; }
@@ -59,7 +90,7 @@
 
     /* ─── HEADER ─────────────────────────────────────────────────── */
     .site-header {
-      background: var(--navy-dark);
+      background: var(--dark-deep);
       padding: 0 1.5rem;
       height: 60px;
       display: flex;
@@ -68,7 +99,8 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      border-bottom: 3px solid var(--orange);
+      border-bottom: 2px solid var(--teal);
+      backdrop-filter: blur(10px);
     }
     .site-header .brand {
       display: flex;
@@ -76,85 +108,89 @@
       gap: 0.75rem;
     }
     .site-header .logo-icon {
-      width: 36px;
-      height: 36px;
-      background: var(--orange);
-      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(44,188,179,0.3);
     }
     .site-header .logo-icon svg { width: 20px; height: 20px; fill: white; }
     .brand-name {
-      font-size: 1rem;
-      font-weight: 700;
+      font-size: 1.05rem;
+      font-weight: 800;
       color: white;
-      letter-spacing: 0.01em;
+      letter-spacing: 0.02em;
     }
     .brand-sub {
-      font-size: 0.7rem;
-      color: var(--grey-400);
-      letter-spacing: 0.06em;
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.08em;
       text-transform: uppercase;
+      font-weight: 500;
     }
     .header-tag {
-      background: var(--orange);
-      color: white;
-      font-size: 0.7rem;
+      background: rgba(44,188,179,0.15);
+      color: var(--teal-light);
+      font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      padding: 0.25rem 0.65rem;
+      padding: 0.3rem 0.75rem;
       border-radius: 20px;
+      border: 1px solid rgba(44,188,179,0.3);
     }
 
     /* ─── HERO BANNER ────────────────────────────────────────────── */
     .hero {
-      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 60%, #2a4a7a 100%);
-      padding: 2rem 1.5rem;
+      background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 50%, #1a3a4a 100%);
+      padding: 2.5rem 1.5rem 2rem;
       position: relative;
       overflow: hidden;
     }
     .hero::before {
       content: '';
       position: absolute;
-      top: -40px; right: -60px;
-      width: 280px; height: 280px;
+      top: -60px; right: -80px;
+      width: 320px; height: 320px;
       border-radius: 50%;
-      background: rgba(232,98,26,0.07);
+      background: radial-gradient(circle, rgba(44,188,179,0.12) 0%, transparent 70%);
       pointer-events: none;
     }
     .hero::after {
       content: '';
       position: absolute;
-      bottom: -80px; left: 30%;
-      width: 200px; height: 200px;
+      bottom: -100px; left: 20%;
+      width: 250px; height: 250px;
       border-radius: 50%;
-      background: rgba(255,255,255,0.03);
+      background: radial-gradient(circle, rgba(44,188,179,0.06) 0%, transparent 70%);
       pointer-events: none;
     }
     .hero-inner {
-      max-width: 900px;
+      max-width: 1200px;
       margin: 0 auto;
       position: relative;
       z-index: 1;
     }
     .hero h1 {
-      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      font-size: clamp(1.5rem, 4vw, 2.4rem);
       color: white;
-      font-weight: 800;
+      font-weight: 900;
       line-height: 1.15;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
     }
-    .hero h1 span { color: var(--orange); }
+    .hero h1 span { color: var(--teal-light); }
     .hero-sub {
       margin-top: 0.5rem;
-      color: rgba(255,255,255,0.65);
+      color: rgba(255,255,255,0.55);
       font-size: 0.9rem;
+      font-weight: 400;
     }
     .hero-stats {
-      margin-top: 1.25rem;
+      margin-top: 1.5rem;
       display: flex;
       gap: 1.5rem;
       flex-wrap: wrap;
@@ -167,15 +203,16 @@
     .hero-stat .num {
       font-size: 1.8rem;
       font-weight: 800;
-      color: var(--orange);
+      color: var(--teal);
       font-family: var(--font-mono);
       line-height: 1;
     }
     .hero-stat .label {
-      font-size: 0.8rem;
-      color: rgba(255,255,255,0.6);
-      letter-spacing: 0.04em;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.05em;
       text-transform: uppercase;
+      font-weight: 500;
     }
 
     /* ─── MAIN LAYOUT ────────────────────────────────────────────── */
@@ -193,7 +230,7 @@
 
     /* ─── FILTER SIDEBAR ─────────────────────────────────────────── */
     .sidebar {
-      background: white;
+      background: var(--surface);
       border-radius: var(--radius);
       box-shadow: var(--shadow-sm);
       border: 1px solid var(--grey-200);
@@ -208,24 +245,24 @@
       justify-content: space-between;
     }
     .sidebar-title {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--grey-400);
     }
     .result-count {
-      font-size: 0.75rem;
-      background: var(--navy);
+      font-size: 0.72rem;
+      background: var(--dark);
       color: white;
-      padding: 0.2rem 0.6rem;
+      padding: 0.2rem 0.65rem;
       border-radius: 20px;
       font-weight: 600;
     }
     .sidebar-body { padding: 1rem 1.25rem; }
     .filter-group { margin-bottom: 1.25rem; }
     .filter-label {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -240,7 +277,7 @@
     .range-val {
       font-size: 0.75rem;
       font-family: var(--font-mono);
-      color: var(--navy);
+      color: var(--dark);
       font-weight: 600;
       min-width: 48px;
       text-align: right;
@@ -255,16 +292,16 @@
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      background: var(--orange);
+      background: var(--teal);
       cursor: pointer;
-      border: 2px solid white;
-      box-shadow: 0 1px 4px rgba(0,0,0,.2);
-      transition: transform var(--transition);
+      border: 2.5px solid white;
+      box-shadow: 0 1px 6px rgba(44,188,179,.35);
+      transition: transform var(--transition), box-shadow var(--transition);
     }
-    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); box-shadow: 0 2px 8px rgba(44,188,179,.5); }
 
     /* Toggle buttons */
     .toggle-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -279,13 +316,14 @@
       transition: all var(--transition);
     }
     .toggle-btn.active {
-      background: var(--navy);
-      border-color: var(--navy);
+      background: var(--dark);
+      border-color: var(--dark);
       color: white;
     }
     .toggle-btn:hover:not(.active) {
-      border-color: var(--navy);
-      color: var(--navy);
+      border-color: var(--teal);
+      color: var(--teal-dark);
+      background: var(--teal-dim);
     }
 
     /* Checkbox grid */
@@ -300,8 +338,8 @@
       font-weight: 500;
     }
     .check-item input[type="checkbox"] {
-      width: 14px; height: 14px;
-      accent-color: var(--orange);
+      width: 15px; height: 15px;
+      accent-color: var(--teal);
       cursor: pointer;
     }
 
@@ -337,7 +375,7 @@
       transition: transform var(--transition);
       box-shadow: 0 1px 3px rgba(0,0,0,.2);
     }
-    .switch input:checked + .switch-track { background: var(--orange); }
+    .switch input:checked + .switch-track { background: var(--teal); }
     .switch input:checked + .switch-track::after { transform: translateX(16px); }
 
     .reset-btn {
@@ -352,7 +390,7 @@
       transition: all var(--transition);
       margin-top: 0.25rem;
     }
-    .reset-btn:hover { background: var(--navy); color: white; border-color: var(--navy); }
+    .reset-btn:hover { background: var(--dark); color: white; border-color: var(--dark); }
 
     /* Sort row */
     .sort-row {
@@ -373,7 +411,7 @@
       background: white;
       outline: none;
     }
-    .sort-select:focus { border-color: var(--orange); }
+    .sort-select:focus { border-color: var(--teal); }
 
     /* ─── ROUTE CARDS ────────────────────────────────────────────── */
     .cards-area {}
@@ -399,8 +437,8 @@
       transition: color 0.15s, border-color 0.15s;
       border-radius: 4px 4px 0 0;
     }
-    .view-tab:hover  { color: var(--navy); }
-    .view-tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+    .view-tab:hover  { color: var(--dark); }
+    .view-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
 
     /* ─── MASTER MAP ─────────────────────────────────────────────── */
     #masterMapPanel { display: none; }
@@ -415,18 +453,19 @@
     }
     .map-route-popup { font-family: inherit; min-width: 200px; }
     .map-route-popup .pop-name {
-      font-weight: 700; font-size: 0.95rem; color: var(--navy); margin-bottom: 0.4rem;
+      font-weight: 700; font-size: 0.95rem; color: var(--dark); margin-bottom: 0.4rem;
     }
     .map-route-popup .pop-stats {
       display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem;
       font-size: 0.8rem; color: var(--grey-600); margin-bottom: 0.6rem;
     }
     .map-route-popup .pop-btn {
-      display: block; width: 100%; padding: 0.4rem;
-      background: var(--orange); color: white; border: none; border-radius: 6px;
+      display: block; width: 100%; padding: 0.45rem;
+      background: var(--teal); color: white; border: none; border-radius: var(--radius-sm);
       font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center;
+      transition: background var(--transition);
     }
-    .map-route-popup .pop-btn:hover { background: var(--navy); }
+    .map-route-popup .pop-btn:hover { background: var(--teal-dark); }
     .master-map-empty {
       display: flex; align-items: center; justify-content: center;
       height: 200px; color: var(--grey-400); font-size: 0.95rem;
@@ -444,24 +483,46 @@
     .routes-grid { display: flex; flex-direction: column; gap: 1rem; }
 
     .route-card {
-      background: white;
+      background: var(--surface);
       border-radius: var(--radius);
       border: 1px solid var(--grey-200);
       box-shadow: var(--shadow-sm);
       overflow: hidden;
-      transition: box-shadow var(--transition), transform var(--transition);
+      transition: box-shadow var(--transition-slow), transform var(--transition), border-color var(--transition);
+      position: relative;
     }
-    .route-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+    .route-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: var(--teal);
+      opacity: 0;
+      transition: opacity var(--transition);
+      border-radius: var(--radius) 0 0 var(--radius);
+    }
+    .route-card:hover {
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+      border-color: rgba(44,188,179,0.3);
+    }
+    .route-card:hover::before { opacity: 1; }
     .route-card:target, .route-card.highlighted {
-      border-color: var(--orange);
-      box-shadow: 0 0 0 3px var(--orange-dim), var(--shadow);
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-dim), var(--shadow);
       animation: cardPulse 0.6s ease-out;
     }
     @keyframes cardPulse {
-      0%   { box-shadow: 0 0 0 0 rgba(232,98,26,0.5); }
-      50%  { box-shadow: 0 0 0 8px rgba(232,98,26,0.2); }
-      100% { box-shadow: 0 0 0 3px var(--orange-dim), var(--shadow); }
+      0%   { box-shadow: 0 0 0 0 rgba(44,188,179,0.5); }
+      50%  { box-shadow: 0 0 0 8px rgba(44,188,179,0.15); }
+      100% { box-shadow: 0 0 0 3px var(--teal-dim), var(--shadow); }
     }
+    /* Staggered card entry animation */
+    @keyframes cardSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .route-card { animation: cardSlideIn 0.35s ease-out both; }
 
     .card-main { padding: 1.1rem 1.25rem 1rem; }
     .card-top {
@@ -474,7 +535,7 @@
     .route-name {
       font-size: 1.1rem;
       font-weight: 800;
-      color: var(--navy);
+      color: var(--dark);
       letter-spacing: -0.01em;
       line-height: 1.2;
     }
@@ -514,6 +575,66 @@
     .badge-dir-SE  { background: #fdf0e6; color: #8b4a00; }
     .badge-dir-SW  { background: #f0e8fd; color: #5a2a9b; }
 
+    /* Weather indicator row on route cards */
+    .card-weather-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin: 0.6rem 0 0.2rem;
+      padding: 0.55rem 0.75rem;
+      background: linear-gradient(135deg, var(--teal-dim), rgba(44,188,179,0.04));
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(44,188,179,0.12);
+      font-size: 0.78rem;
+      flex-wrap: wrap;
+    }
+    .card-weather-icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .card-weather-temp {
+      font-weight: 700;
+      color: var(--dark);
+      font-size: 0.82rem;
+    }
+    .card-weather-wind {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--grey-500);
+      font-size: 0.75rem;
+    }
+    .card-weather-wind svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+    .card-wind-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .card-wind-badge.pick-wind-tail { background: rgba(16,185,129,0.12); color: #059669; }
+    .card-wind-badge.pick-wind-favour { background: rgba(245,158,11,0.12); color: #b45309; }
+    .card-wind-badge.pick-wind-cross { background: rgba(251,146,60,0.12); color: #c2410c; }
+    .card-wind-badge.pick-wind-head { background: rgba(239,68,68,0.12); color: #dc2626; }
+    .card-match-score {
+      margin-left: auto;
+      font-weight: 800;
+      font-size: 0.78rem;
+      color: var(--teal-dark);
+      white-space: nowrap;
+    }
+    .card-match-score .match-num {
+      font-size: 0.92rem;
+    }
+
     .card-meta {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -533,7 +654,7 @@
     }
     .meta-val {
       font-size: 0.85rem;
-      color: var(--navy);
+      color: var(--dark);
       font-weight: 600;
       margin-top: 0.15rem;
     }
@@ -555,7 +676,7 @@
       font-size: 0.82rem;
       color: var(--grey-800);
     }
-    .cafe-name a { color: var(--orange); }
+    .cafe-name a { color: var(--teal-dark); }
     .cafe-name a:hover { text-decoration: underline; }
     .cafe-hours { font-size: 0.75rem; color: var(--grey-400); margin-top: 0.15rem; }
 
@@ -612,16 +733,16 @@
       letter-spacing: 0.02em;
     }
     .btn-map {
-      background: var(--navy);
+      background: var(--dark);
       color: white;
     }
-    .btn-map:hover { background: var(--navy-light); }
-    .btn-map.active { background: var(--orange); }
+    .btn-map:hover { background: var(--dark-light); }
+    .btn-map.active { background: var(--teal); }
     .btn-gpx {
       background: var(--green);
       color: white;
     }
-    .btn-gpx:hover { opacity: 0.85; }
+    .btn-gpx:hover { opacity: 0.88; }
     .btn-gpx:disabled {
       background: var(--grey-200);
       color: var(--grey-400);
@@ -629,22 +750,22 @@
     }
     .btn-garmin {
       background: white;
-      color: var(--navy);
+      color: var(--dark);
       border: 1.5px solid var(--grey-200);
     }
-    .btn-garmin:hover { border-color: var(--navy); background: var(--grey-50); }
+    .btn-garmin:hover { border-color: var(--teal); background: var(--teal-dim); color: var(--teal-dark); }
     .btn-share {
       background: white;
       color: var(--grey-600);
       border: 1.5px solid var(--grey-200);
       margin-left: auto;
     }
-    .btn-share:hover { border-color: var(--orange); color: var(--orange); }
+    .btn-share:hover { border-color: var(--teal); color: var(--teal-dark); }
 
     /* Map panel */
     .map-panel {
       display: none;
-      border-top: 3px solid var(--orange);
+      border-top: 3px solid var(--teal);
       background: var(--grey-50);
     }
     .map-panel.open { display: block; }
@@ -653,7 +774,7 @@
       display: flex;
       gap: 0;
       overflow-x: auto;
-      background: var(--navy);
+      background: var(--dark);
       padding: 0;
     }
     .stats-bar-item {
@@ -671,7 +792,7 @@
     .stats-bar-val {
       font-size: 0.9rem;
       font-weight: 800;
-      color: var(--orange);
+      color: var(--teal-light);
       font-family: var(--font-mono);
       line-height: 1.1;
     }
@@ -713,16 +834,18 @@
     .empty-state p { font-size: 0.875rem; margin-bottom: 1.25rem; }
     .empty-reset {
       display: inline-block;
-      background: var(--orange);
+      background: var(--teal);
       color: white;
-      padding: 0.5rem 1.25rem;
+      padding: 0.55rem 1.5rem;
       border-radius: var(--radius-sm);
       font-weight: 700;
       font-size: 0.85rem;
       cursor: pointer;
       border: none;
       font-family: inherit;
+      transition: background var(--transition);
     }
+    .empty-reset:hover { background: var(--teal-dark); }
 
     /* ─── LOADING STATE ──────────────────────────────────────────── */
     .loading-state {
@@ -733,20 +856,781 @@
     .spinner {
       width: 36px; height: 36px;
       border: 3px solid var(--grey-200);
-      border-top-color: var(--orange);
+      border-top-color: var(--teal);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       margin: 0 auto 1rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ─── WEATHER STRIP ───────────────────────────────────────────── */
+    .weather-strip {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding: 1rem 1.5rem;
+      background: var(--dark-deep);
+      border-bottom: 1px solid rgba(44,188,179,0.15);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(44,188,179,0.3) transparent;
+    }
+    .weather-strip::-webkit-scrollbar { height: 4px; }
+    .weather-strip::-webkit-scrollbar-track { background: transparent; }
+    .weather-strip::-webkit-scrollbar-thumb { background: rgba(44,188,179,0.3); border-radius: 2px; }
+
+    .weather-day {
+      flex: 0 0 auto;
+      min-width: 100px;
+      padding: 0.65rem 0.75rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+      transition: all var(--transition);
+      cursor: default;
+    }
+    .weather-day:hover {
+      background: rgba(44,188,179,0.08);
+      border-color: rgba(44,188,179,0.2);
+    }
+    .weather-day.sunday-highlight {
+      background: rgba(44,188,179,0.12);
+      border-color: var(--teal);
+      box-shadow: 0 0 12px rgba(44,188,179,0.15);
+    }
+    .weather-day-name {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 0.3rem;
+    }
+    .weather-day.sunday-highlight .weather-day-name { color: var(--teal-light); }
+    .weather-day-icon { font-size: 1.4rem; line-height: 1; margin-bottom: 0.25rem; }
+    .weather-day-temp {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: white;
+      font-family: var(--font-mono);
+    }
+    .weather-day-temp span {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.4);
+      font-weight: 500;
+    }
+    .weather-day-wind {
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.45);
+      margin-top: 0.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+    }
+    .weather-day-wind .wind-arrow {
+      display: inline-block;
+      font-size: 0.75rem;
+      transition: transform 0.3s ease;
+    }
+    .weather-day-rain {
+      font-size: 0.6rem;
+      color: rgba(255,255,255,0.35);
+      margin-top: 0.15rem;
+    }
+    .weather-loading {
+      color: rgba(255,255,255,0.35);
+      font-size: 0.78rem;
+      text-align: center;
+      padding: 0.8rem;
+      width: 100%;
+    }
+
+    /* ─── RIDE PLANNER ──────────────────────────────────────────── */
+    .ride-planner {
+      background: linear-gradient(160deg, var(--dark) 0%, #1a3040 50%, var(--dark-light) 100%);
+      padding: 2rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .ride-planner::before {
+      content: '';
+      position: absolute;
+      top: -30%; right: -10%;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(44,188,179,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .ride-planner-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 2rem;
+      align-items: start;
+    }
+    .planner-main { }
+    .planner-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 0.3rem;
+    }
+    .planner-heading {
+      font-size: clamp(1.3rem, 3vw, 1.8rem);
+      font-weight: 900;
+      color: white;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 0.4rem;
+    }
+    .planner-wind-advice {
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.5;
+      margin-bottom: 1.25rem;
+    }
+    .planner-wind-advice strong {
+      color: var(--teal-light);
+      font-weight: 600;
+    }
+
+    /* Target distance slider in planner */
+    .planner-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .planner-control-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .planner-slider {
+      flex: 1;
+      min-width: 120px;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.15);
+      outline: none;
+    }
+    .planner-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--teal);
+      cursor: pointer;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+    .planner-slider-val {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--teal-light);
+      font-family: var(--font-mono);
+      min-width: 52px;
+    }
+
+    /* Weather card sidebar */
+    .planner-weather-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(44,188,179,0.2);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .planner-weather-day {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 0.15rem;
+    }
+    .planner-weather-date {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 0.75rem;
+    }
+    .planner-weather-icon {
+      font-size: 2.5rem;
+      line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+    .planner-weather-desc {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 0.75rem;
+    }
+    .planner-weather-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      text-align: center;
+    }
+    .planner-weather-stat-val {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: white;
+      font-family: var(--font-mono);
+      line-height: 1.2;
+    }
+    .planner-weather-stat-label {
+      font-size: 0.6rem;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Wind compass SVG */
+    .wind-compass-wrap {
+      margin: 0.75rem auto 0;
+      width: 90px; height: 90px;
+      position: relative;
+    }
+    .wind-compass-wrap svg { width: 100%; height: 100%; }
+
+    /* Top Picks section */
+    .planner-picks-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 0.75rem;
+    }
+    .planner-picks {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+    .pick-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      padding: 1rem;
+      cursor: pointer;
+      transition: all var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .pick-card:hover {
+      background: rgba(44,188,179,0.10);
+      border-color: rgba(44,188,179,0.3);
+      transform: translateY(-2px);
+    }
+    .pick-card-match {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--teal-light);
+      background: rgba(44,188,179,0.15);
+      padding: 0.15rem 0.5rem;
+      border-radius: 20px;
+      margin-bottom: 0.5rem;
+    }
+    .pick-card-name {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: white;
+      line-height: 1.25;
+      margin-bottom: 0.35rem;
+    }
+    .pick-card-meta {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.5);
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.4rem;
+    }
+    .pick-card-wind {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 20px;
+    }
+    .pick-wind-tail { background: rgba(16,185,129,0.15); color: #34d399; }
+    .pick-wind-favour { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .pick-wind-cross { background: rgba(251,146,60,0.15); color: #fb923c; }
+    .pick-wind-head { background: rgba(239,68,68,0.15); color: #f87171; }
+    .pick-card-cafe {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.45);
+      margin-top: 0.3rem;
+    }
+    .planner-no-weather {
+      text-align: center;
+      padding: 1.5rem;
+      color: rgba(255,255,255,0.4);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 800px) {
+      .ride-planner-inner {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      .planner-weather-card { order: -1; }
+      .planner-picks { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 801px) and (max-width: 1024px) {
+      .planner-picks { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ─── FIND MY RIDE ──────────────────────────────────────────── */
+    .find-ride {
+      background: var(--dark-deep);
+      border-top: 1px solid rgba(44,188,179,0.15);
+    }
+    .find-ride-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0;
+    }
+    .find-ride-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: none;
+      border: none;
+      color: white;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      font-family: var(--font-main);
+      transition: background var(--transition);
+    }
+    .find-ride-toggle:hover {
+      background: rgba(44,188,179,0.06);
+    }
+    .find-ride-toggle-left {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .find-ride-toggle-icon {
+      font-size: 1.1rem;
+    }
+    .find-ride-toggle-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .find-ride-toggle-sub {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.4);
+      margin-left: 0.5rem;
+    }
+    .find-ride-chevron {
+      font-size: 0.75rem;
+      color: var(--teal);
+      transition: transform var(--transition);
+    }
+    .find-ride.open .find-ride-chevron {
+      transform: rotate(180deg);
+    }
+    .find-ride-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .find-ride.open .find-ride-panel {
+      max-height: 600px;
+    }
+    .find-ride-content {
+      padding: 0 1.5rem 1.5rem;
+    }
+    .find-ride-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+    .find-ride-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .find-ride-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+    }
+    .find-ride-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .find-ride-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      outline: none;
+    }
+    .find-ride-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--teal);
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    }
+    .find-ride-slider::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--teal);
+      cursor: pointer;
+      border: 2px solid white;
+    }
+    .find-ride-slider-val {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--teal-light);
+      font-family: var(--font-mono);
+      min-width: 48px;
+      text-align: right;
+    }
+    .find-ride-options {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .find-ride-opt {
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: var(--font-main);
+    }
+    .find-ride-opt:hover {
+      background: rgba(44,188,179,0.15);
+      border-color: rgba(44,188,179,0.3);
+      color: white;
+    }
+    .find-ride-opt.active {
+      background: var(--teal);
+      color: white;
+      border-color: var(--teal);
+    }
+    .find-ride-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .find-ride-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.5rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 700;
+      background: var(--teal);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: var(--font-main);
+      letter-spacing: 0.02em;
+    }
+    .find-ride-btn:hover {
+      background: var(--teal-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(44,188,179,0.3);
+    }
+    .find-ride-btn:active {
+      transform: scale(0.97);
+    }
+    .find-ride-reset {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.4);
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-family: var(--font-main);
+      padding: 0.4rem 0.6rem;
+      border-radius: var(--radius-sm);
+      transition: color var(--transition);
+    }
+    .find-ride-reset:hover {
+      color: white;
+    }
+    .find-ride-result-msg {
+      font-size: 0.78rem;
+      color: var(--teal-light);
+      margin-left: auto;
+      font-weight: 600;
+    }
+    @media (max-width: 600px) {
+      .find-ride-grid {
+        grid-template-columns: 1fr;
+      }
+      .find-ride-toggle-sub { display: none; }
+    }
+
+    /* ─── ROUTE COMPARISON ───────────────────────────────────────── */
+    .compare-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      background: rgba(44,188,179,0.08);
+      color: var(--grey-400);
+      border: 1px solid rgba(44,188,179,0.15);
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: var(--font-main);
+      white-space: nowrap;
+    }
+    .compare-toggle:hover {
+      background: rgba(44,188,179,0.15);
+      color: var(--teal-dark);
+      border-color: var(--teal);
+    }
+    .compare-toggle.active {
+      background: var(--teal);
+      color: white;
+      border-color: var(--teal);
+    }
+    .compare-toggle .compare-check {
+      width: 14px; height: 14px;
+      border-radius: 3px;
+      border: 2px solid currentColor;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .compare-toggle.active .compare-check {
+      background: white;
+      color: var(--teal);
+      border-color: white;
+    }
+
+    /* Floating comparison bar */
+    .compare-bar {
+      position: fixed;
+      bottom: -80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--dark);
+      border: 1px solid rgba(44,188,179,0.3);
+      border-radius: var(--radius);
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(44,188,179,0.1);
+      z-index: 1000;
+      transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      max-width: 90vw;
+    }
+    .compare-bar.visible {
+      bottom: 24px;
+    }
+    .compare-bar-chips {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .compare-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(44,188,179,0.15);
+      color: var(--teal-light);
+      white-space: nowrap;
+    }
+    .compare-chip-remove {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0;
+      line-height: 1;
+      font-family: var(--font-main);
+    }
+    .compare-chip-remove:hover { color: white; }
+    .compare-bar-btn {
+      padding: 0.5rem 1.2rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: var(--teal);
+      color: white;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--transition);
+      font-family: var(--font-main);
+    }
+    .compare-bar-btn:hover {
+      background: var(--teal-dark);
+    }
+    .compare-bar-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Comparison modal/panel */
+    .compare-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 2000;
+      backdrop-filter: blur(4px);
+    }
+    .compare-overlay.visible { display: flex; align-items: center; justify-content: center; }
+    .compare-modal {
+      background: white;
+      border-radius: var(--radius);
+      width: 95vw;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+    }
+    .compare-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--grey-100);
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 1;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .compare-header h3 {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--dark);
+      margin: 0;
+    }
+    .compare-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: var(--grey-400);
+      padding: 0.3rem;
+      border-radius: var(--radius-sm);
+      transition: color var(--transition);
+      font-family: var(--font-main);
+    }
+    .compare-close:hover { color: var(--dark); }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .compare-table th {
+      text-align: left;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--grey-400);
+      padding: 0.6rem 1rem;
+      background: var(--grey-50);
+      border-bottom: 1px solid var(--grey-100);
+      white-space: nowrap;
+      width: 120px;
+    }
+    .compare-table td {
+      padding: 0.6rem 1rem;
+      font-size: 0.82rem;
+      color: var(--dark);
+      border-bottom: 1px solid var(--grey-50);
+      text-align: center;
+      font-weight: 500;
+    }
+    .compare-table td:first-child {
+      text-align: left;
+      font-weight: 700;
+      color: var(--dark);
+    }
+    .compare-table .compare-route-name {
+      font-weight: 800;
+      font-size: 0.88rem;
+      color: var(--dark);
+    }
+    .compare-table .compare-best {
+      color: var(--teal-dark);
+      font-weight: 700;
+    }
+    .compare-table .compare-wind-cell {
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .compare-elev-wrap {
+      padding: 1rem 1.5rem 1.5rem;
+      border-top: 1px solid var(--grey-100);
+    }
+    .compare-elev-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--grey-400);
+      margin-bottom: 0.75rem;
+    }
+    .compare-elev-chart {
+      height: 180px;
+      position: relative;
+    }
+    @media (max-width: 600px) {
+      .compare-modal { width: 100vw; max-height: 100vh; border-radius: 0; }
+      .compare-table th, .compare-table td { padding: 0.5rem 0.6rem; font-size: 0.72rem; }
+      .compare-bar { max-width: 95vw; padding: 0.6rem 0.8rem; }
+    }
+
     /* ─── FOOTER ─────────────────────────────────────────────────── */
     .site-footer {
-      background: var(--navy-dark);
-      color: rgba(255,255,255,0.4);
+      background: var(--dark-deep);
+      color: rgba(255,255,255,0.35);
       text-align: center;
       font-size: 0.72rem;
-      padding: 1.25rem;
+      padding: 1.5rem;
       margin-top: 2rem;
       line-height: 1.6;
     }
@@ -756,7 +1640,7 @@
       display: none;
       width: 100%;
       padding: 0.65rem 1rem;
-      background: var(--navy);
+      background: var(--dark);
       color: white;
       font-size: 0.85rem;
       font-weight: 700;
@@ -765,7 +1649,7 @@
       justify-content: space-between;
       margin-bottom: 1rem;
     }
-    .mobile-filter-toggle span { font-size: 0.75rem; background: var(--orange); border-radius: 20px; padding: 0.15rem 0.5rem; }
+    .mobile-filter-toggle span { font-size: 0.75rem; background: var(--teal); border-radius: 20px; padding: 0.15rem 0.5rem; }
 
     /* ─── RESPONSIVE ─────────────────────────────────────────────── */
     @media (max-width: 800px) {
@@ -796,8 +1680,8 @@
 
     /* Hash highlight animation */
     @keyframes highlightPulse {
-      0%   { box-shadow: 0 0 0 4px var(--orange); }
-      70%  { box-shadow: 0 0 0 8px rgba(232,98,26,0); }
+      0%   { box-shadow: 0 0 0 4px var(--teal); }
+      70%  { box-shadow: 0 0 0 8px rgba(44,188,179,0); }
       100% { box-shadow: none; }
     }
     .route-card.pulse { animation: highlightPulse 1.2s ease-out; }
@@ -809,12 +1693,12 @@
       bottom: calc(100% + 6px);
       left: 50%;
       transform: translateX(-50%);
-      background: var(--navy-dark);
+      background: var(--dark-deep);
       color: white;
       font-size: 0.7rem;
       white-space: nowrap;
       padding: 0.3rem 0.6rem;
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       pointer-events: none;
       z-index: 200;
     }
@@ -865,11 +1749,113 @@
   </div>
 </section>
 
+<!-- ── WEATHER STRIP ──────────────────────────────────────────── -->
+<div class="weather-strip" id="weatherStrip">
+  <div class="weather-loading">Loading 7-day forecast...</div>
+</div>
+
+<!-- ── RIDE PLANNER ──────────────────────────────────────────── -->
+<section class="ride-planner" id="ridePlanner">
+  <div class="ride-planner-inner">
+    <div class="planner-main">
+      <div class="planner-title">Ride Planner</div>
+      <h2 class="planner-heading" id="plannerHeading">This Sunday's Ride</h2>
+      <p class="planner-wind-advice" id="plannerAdvice">Loading weather data...</p>
+
+      <div class="planner-controls">
+        <span class="planner-control-label">Target distance</span>
+        <input type="range" class="planner-slider" id="plannerDist" min="10" max="130" value="40" step="5">
+        <span class="planner-slider-val" id="plannerDistVal">40 mi</span>
+      </div>
+
+      <div class="planner-picks-title">Top picks for Sunday</div>
+      <div class="planner-picks" id="plannerPicks">
+        <div class="planner-no-weather">Waiting for data...</div>
+      </div>
+    </div>
+
+    <div class="planner-weather-card" id="plannerWeatherCard">
+      <div class="planner-no-weather">Loading weather...</div>
+    </div>
+  </div>
+</section>
+
+<!-- Find My Ride panel -->
+<section class="find-ride" id="findMyRide">
+  <div class="find-ride-inner">
+    <button class="find-ride-toggle" id="findRideToggle" aria-expanded="false" aria-controls="findRidePanel">
+      <span class="find-ride-toggle-left">
+        <span class="find-ride-toggle-icon">🔍</span>
+        <span class="find-ride-toggle-title">Find My Ride</span>
+        <span class="find-ride-toggle-sub">Set your preferences and we'll score every route</span>
+      </span>
+      <span class="find-ride-chevron">▼</span>
+    </button>
+    <div class="find-ride-panel" id="findRidePanel" role="region">
+      <div class="find-ride-content">
+        <div class="find-ride-grid">
+          <div class="find-ride-field">
+            <label class="find-ride-label" for="fmrDist">Target distance</label>
+            <div class="find-ride-slider-row">
+              <input type="range" class="find-ride-slider" id="fmrDist" min="10" max="130" value="40" step="5">
+              <span class="find-ride-slider-val" id="fmrDistVal">40 mi</span>
+            </div>
+          </div>
+          <div class="find-ride-field">
+            <label class="find-ride-label" for="fmrTime">Time available</label>
+            <div class="find-ride-slider-row">
+              <input type="range" class="find-ride-slider" id="fmrTime" min="1" max="8" value="3" step="0.5">
+              <span class="find-ride-slider-val" id="fmrTimeVal">3 hrs</span>
+            </div>
+          </div>
+          <div class="find-ride-field">
+            <span class="find-ride-label">Cafe stop?</span>
+            <div class="find-ride-options" id="fmrCafe" role="radiogroup" aria-label="Cafe preference">
+              <button class="find-ride-opt active" data-val="any" role="radio" aria-checked="true">Don't mind</button>
+              <button class="find-ride-opt" data-val="yes" role="radio" aria-checked="false">Yes please</button>
+              <button class="find-ride-opt" data-val="no" role="radio" aria-checked="false">No thanks</button>
+            </div>
+          </div>
+          <div class="find-ride-field">
+            <span class="find-ride-label">Difficulty</span>
+            <div class="find-ride-options" id="fmrDifficulty" role="radiogroup" aria-label="Difficulty preference">
+              <button class="find-ride-opt" data-val="easy" role="radio" aria-checked="false">Easy</button>
+              <button class="find-ride-opt active" data-val="moderate" role="radio" aria-checked="true">Moderate</button>
+              <button class="find-ride-opt" data-val="hard" role="radio" aria-checked="false">Challenge</button>
+            </div>
+          </div>
+          <div class="find-ride-field">
+            <span class="find-ride-label">Route type</span>
+            <div class="find-ride-options" id="fmrType" role="radiogroup" aria-label="Route type preference">
+              <button class="find-ride-opt active" data-val="any" role="radio" aria-checked="true">Any</button>
+              <button class="find-ride-opt" data-val="Road" role="radio" aria-checked="false">Road</button>
+              <button class="find-ride-opt" data-val="MTB" role="radio" aria-checked="false">MTB</button>
+              <button class="find-ride-opt" data-val="Gravel" role="radio" aria-checked="false">Gravel</button>
+            </div>
+          </div>
+          <div class="find-ride-field">
+            <span class="find-ride-label">Busway</span>
+            <div class="find-ride-options" id="fmrBusway" role="radiogroup" aria-label="Busway preference">
+              <button class="find-ride-opt active" data-val="any" role="radio" aria-checked="true">Don't mind</button>
+              <button class="find-ride-opt" data-val="avoid" role="radio" aria-checked="false">Avoid</button>
+            </div>
+          </div>
+        </div>
+        <div class="find-ride-actions">
+          <button class="find-ride-btn" id="fmrSearch">🔍 Find routes</button>
+          <button class="find-ride-reset" id="fmrReset">Reset all</button>
+          <span class="find-ride-result-msg" id="fmrResultMsg"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- DEBUG PANEL — remove once working -->
-<div id="debugPanel" style="background:#111e30;color:#e8f0fe;font-family:monospace;font-size:0.78rem;padding:1rem 1.5rem;border-bottom:3px solid #e8621a;display:none">
+<div id="debugPanel" style="background:#111B24;color:#e8f0fe;font-family:monospace;font-size:0.78rem;padding:1rem 1.5rem;border-bottom:3px solid #2CBCB3;display:none">
   <div style="max-width:1280px;margin:0 auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">
-      <strong style="color:#e8621a;font-size:0.85rem;">🔧 Debug Panel — remove once working</strong>
+      <strong style="color:#2CBCB3;font-size:0.85rem;">🔧 Debug Panel — remove once working</strong>
       <button onclick="document.getElementById('debugPanel').remove()" style="background:rgba(255,255,255,0.1);border:none;color:white;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.75rem">✕ Hide</button>
     </div>
     <div id="debugLog" style="display:flex;flex-direction:column;gap:0.3rem;"></div>
@@ -1029,6 +2015,22 @@
 
 </main>
 
+<!-- ── COMPARISON BAR & MODAL ─────────────────────────────────────── -->
+<div class="compare-bar" id="compareBar">
+  <div class="compare-bar-chips" id="compareChips"></div>
+  <button class="compare-bar-btn" id="compareBtn" disabled>Compare →</button>
+</div>
+
+<div class="compare-overlay" id="compareOverlay">
+  <div class="compare-modal" id="compareModal">
+    <div class="compare-header">
+      <h3>Route Comparison</h3>
+      <button class="compare-close" id="compareClose" aria-label="Close comparison">✕</button>
+    </div>
+    <div id="compareBody"></div>
+  </div>
+</div>
+
 <!-- ── FOOTER ─────────────────────────────────────────────────────── -->
 <footer class="site-footer">
   SOCC — Swavesey & Over Cycling Club &nbsp;|&nbsp;
@@ -1052,6 +2054,9 @@ const CONFIG = {
   CAFES_GID:     '2092417686',           // Cafes tab
   USE_DEMO_DATA: false,
   SHOW_DEBUG:    false,          // true = show debug panel; false = hidden
+  WEATHER_ENABLED: true,         // true = fetch 7-day forecast from Open-Meteo
+  DEFAULT_RIDE_DAY: 'sunday',    // day the club typically rides
+  TARGET_DISTANCE: 40,           // default target distance in miles for ride planner
 
   // Maps your actual sheet column headers → internal app field names (all lowercase keys)
   COLUMN_MAP: {
@@ -1241,11 +2246,134 @@ const DEMO_CAFES = [
 ];
 
 /* ════════════════════════════════════════════════════════════════════
+   WEATHER — Open-Meteo API (free, no API key, CORS-enabled)
+   ════════════════════════════════════════════════════════════════════ */
+const WEATHER_CACHE_KEY = 'socc_weather_cache';
+const WEATHER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+// WMO Weather Code → icon + description mapping
+const WMO_CODES = {
+  0: { icon: '☀️', desc: 'Clear sky' },
+  1: { icon: '🌤️', desc: 'Mainly clear' },
+  2: { icon: '⛅', desc: 'Partly cloudy' },
+  3: { icon: '☁️', desc: 'Overcast' },
+  45: { icon: '🌫️', desc: 'Foggy' },
+  48: { icon: '🌫️', desc: 'Icy fog' },
+  51: { icon: '🌦️', desc: 'Light drizzle' },
+  53: { icon: '🌦️', desc: 'Drizzle' },
+  55: { icon: '🌧️', desc: 'Heavy drizzle' },
+  61: { icon: '🌧️', desc: 'Light rain' },
+  63: { icon: '🌧️', desc: 'Rain' },
+  65: { icon: '🌧️', desc: 'Heavy rain' },
+  66: { icon: '🌨️', desc: 'Freezing rain' },
+  67: { icon: '🌨️', desc: 'Heavy freezing rain' },
+  71: { icon: '🌨️', desc: 'Light snow' },
+  73: { icon: '🌨️', desc: 'Snow' },
+  75: { icon: '❄️', desc: 'Heavy snow' },
+  77: { icon: '🌨️', desc: 'Snow grains' },
+  80: { icon: '🌦️', desc: 'Light showers' },
+  81: { icon: '🌧️', desc: 'Showers' },
+  82: { icon: '⛈️', desc: 'Heavy showers' },
+  85: { icon: '🌨️', desc: 'Snow showers' },
+  86: { icon: '❄️', desc: 'Heavy snow showers' },
+  95: { icon: '⛈️', desc: 'Thunderstorm' },
+  96: { icon: '⛈️', desc: 'Thunderstorm + hail' },
+  99: { icon: '⛈️', desc: 'Thunderstorm + heavy hail' },
+};
+
+function degreesToCompass(deg) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+const DEMO_WEATHER = {
+  daily: [
+    { date: '2026-03-01', dayName: 'Sunday', tempMax: 11, tempMin: 4, windSpeed: 14, windDir: 210, windDirLabel: 'SW', rainProb: 25, weatherCode: 2, icon: '⛅', desc: 'Partly cloudy' },
+    { date: '2026-03-02', dayName: 'Monday', tempMax: 9, tempMin: 3, windSpeed: 18, windDir: 240, windDirLabel: 'WSW', rainProb: 60, weatherCode: 61, icon: '🌧️', desc: 'Light rain' },
+    { date: '2026-03-03', dayName: 'Tuesday', tempMax: 10, tempMin: 5, windSpeed: 12, windDir: 180, windDirLabel: 'S', rainProb: 35, weatherCode: 3, icon: '☁️', desc: 'Overcast' },
+    { date: '2026-03-04', dayName: 'Wednesday', tempMax: 12, tempMin: 6, windSpeed: 8, windDir: 150, windDirLabel: 'SE', rainProb: 10, weatherCode: 1, icon: '🌤️', desc: 'Mainly clear' },
+    { date: '2026-03-05', dayName: 'Thursday', tempMax: 13, tempMin: 7, windSpeed: 10, windDir: 90, windDirLabel: 'E', rainProb: 15, weatherCode: 0, icon: '☀️', desc: 'Clear sky' },
+    { date: '2026-03-06', dayName: 'Friday', tempMax: 11, tempMin: 5, windSpeed: 16, windDir: 270, windDirLabel: 'W', rainProb: 45, weatherCode: 80, icon: '🌦️', desc: 'Light showers' },
+    { date: '2026-03-07', dayName: 'Saturday', tempMax: 10, tempMin: 4, windSpeed: 20, windDir: 315, windDirLabel: 'NW', rainProb: 55, weatherCode: 63, icon: '🌧️', desc: 'Rain' },
+  ],
+  sunday: null, // set during parsing
+  lastFetched: Date.now(),
+};
+DEMO_WEATHER.sunday = DEMO_WEATHER.daily[0];
+
+async function fetchWeather() {
+  if (!CONFIG.WEATHER_ENABLED) return null;
+
+  if (CONFIG.USE_DEMO_DATA) {
+    dbg('Weather: using demo data', true);
+    return DEMO_WEATHER;
+  }
+
+  // Check cache
+  try {
+    const cached = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY));
+    if (cached && (Date.now() - cached.lastFetched < WEATHER_CACHE_TTL)) {
+      dbg(`Weather cache hit — ${Math.floor((Date.now() - cached.lastFetched) / 60000)} min old`, true);
+      return cached;
+    }
+  } catch(e) { /* ignore */ }
+
+  // Fetch from Open-Meteo
+  const lat = 52.3063, lon = -0.0004; // Swavesey
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+    + `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,weathercode`
+    + `&wind_speed_unit=mph&timezone=Europe%2FLondon&forecast_days=7`;
+
+  try {
+    dbg(`Weather: fetching from Open-Meteo...`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const daily = json.daily.time.map((dateStr, i) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      const wmo = json.daily.weathercode[i];
+      const wmoInfo = WMO_CODES[wmo] || { icon: '🌤️', desc: 'Unknown' };
+      const windDir = Math.round(json.daily.wind_direction_10m_dominant[i] || 0);
+      return {
+        date: dateStr,
+        dayName: dayNames[d.getDay()],
+        tempMax: Math.round(json.daily.temperature_2m_max[i]),
+        tempMin: Math.round(json.daily.temperature_2m_min[i]),
+        windSpeed: Math.round(json.daily.wind_speed_10m_max[i]),
+        windDir: windDir,
+        windDirLabel: degreesToCompass(windDir),
+        rainProb: Math.round(json.daily.precipitation_probability_max[i] || 0),
+        weatherCode: wmo,
+        icon: wmoInfo.icon,
+        desc: wmoInfo.desc,
+      };
+    });
+
+    // Find next Sunday (or today if it is Sunday)
+    const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+    const sunday = daily.find(d => d.dayName === rideDay) || daily[0];
+
+    const weather = { daily, sunday, lastFetched: Date.now() };
+
+    // Cache it
+    try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(weather)); } catch(e) { /* quota */ }
+    dbg(`Weather fetched — ${daily.length} days, ${rideDay}: ${sunday.icon} ${sunday.tempMax}°C, wind ${sunday.windDirLabel} ${sunday.windSpeed}mph`, true);
+    return weather;
+  } catch(e) {
+    dbg(`Weather fetch failed: ${e.message}`, false);
+    return null;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    STATE
    ════════════════════════════════════════════════════════════════════ */
 let allRoutes = [];
 let filteredRoutes = [];
 let allCafes = [];
+let weatherData = null;  // populated by fetchWeather()
 let openMaps = {};   // cardId → leaflet map instance
 let filterTimer = null;
 
@@ -1257,6 +2385,7 @@ const state = {
   mapDisplay: 'all',  // 'routes' | 'all' | 'cafes'
   excludeBusway: false,
   sort: 'name',
+  targetDistance: CONFIG.TARGET_DISTANCE,  // for ride planner
 };
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1541,6 +2670,7 @@ function applyFilters() {
   refreshMasterMap(); // keep master map in sync with filters
 
   filteredRoutes.sort((a, b) => {
+    if (state.sort === 'fmr_score')  return (b.fmrScore||0) - (a.fmrScore||0);
     if (state.sort === 'name')       return safe(a.route_name).localeCompare(safe(b.route_name));
     if (state.sort === 'dist_asc')   return (a.distance_miles||0) - (b.distance_miles||0);
     if (state.sort === 'dist_desc')  return (b.distance_miles||0) - (a.distance_miles||0);
@@ -1600,6 +2730,711 @@ function normaliseDir(d) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   WEATHER RENDERING
+   ════════════════════════════════════════════════════════════════════ */
+function renderWeatherStrip(weather) {
+  const strip = document.getElementById('weatherStrip');
+  if (!strip) return;
+
+  if (!weather || !weather.daily || weather.daily.length === 0) {
+    strip.innerHTML = '<div class="weather-loading">Weather unavailable</div>';
+    return;
+  }
+
+  const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+
+  strip.innerHTML = weather.daily.map(day => {
+    const isSunday = day.dayName === rideDay;
+    const windRotation = day.windDir; // degrees clockwise from N (direction wind is FROM)
+    return `<div class="weather-day${isSunday ? ' sunday-highlight' : ''}" title="${escHtml(day.desc)}">
+      <div class="weather-day-name">${isSunday ? '&#9733; ' : ''}${escHtml(day.dayName.slice(0, 3))}</div>
+      <div class="weather-day-icon">${day.icon}</div>
+      <div class="weather-day-temp">${day.tempMax}° <span>${day.tempMin}°</span></div>
+      <div class="weather-day-wind">
+        <span class="wind-arrow" style="transform:rotate(${windRotation}deg)">↓</span>
+        ${escHtml(day.windDirLabel)} ${day.windSpeed}
+      </div>
+      <div class="weather-day-rain">${day.rainProb > 0 ? '💧 ' + day.rainProb + '%' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RIDE PLANNER — Scoring & Rendering
+   ════════════════════════════════════════════════════════════════════ */
+const DIR_TO_BEARING = { N:0, NE:45, E:90, SE:135, S:180, SW:225, W:270, NW:315 };
+
+function windAlignmentScore(routeDir, sundayWeather) {
+  if (!sundayWeather) return 0;
+  const routeBearing = DIR_TO_BEARING[normaliseDir(routeDir)] ?? 180;
+  const returnBearing = (routeBearing + 180) % 360;
+  const windFrom = sundayWeather.windDir; // degrees wind is coming FROM
+  let angleDiff = Math.abs(returnBearing - windFrom);
+  if (angleDiff > 180) angleDiff = 360 - angleDiff;
+  return Math.cos(angleDiff * Math.PI / 180); // 1.0 = perfect tailwind home, -1.0 = headwind home
+}
+
+function windLabel(score) {
+  if (score > 0.7)  return { text: 'Tailwind home',     cls: 'pick-wind-tail' };
+  if (score > 0.25) return { text: 'Mostly favourable', cls: 'pick-wind-favour' };
+  if (score > -0.25) return { text: 'Crosswind',        cls: 'pick-wind-cross' };
+  return                     { text: 'Headwind home',    cls: 'pick-wind-head' };
+}
+
+function scoreSundayRoutes(routes, weather, targetDist) {
+  if (!weather || !weather.sunday) return routes.slice(0, 3);
+  const sunday = weather.sunday;
+
+  return routes.map(route => {
+    const dist = safeNum(route.distance_miles);
+    const dir = normaliseDir(route.direction);
+
+    // Wind alignment (45% weight)
+    const ws = windAlignmentScore(dir, sunday);
+
+    // Distance match — gaussian around target (35% weight)
+    const distDiff = Math.abs(dist - targetDist);
+    const distScore = Math.max(0, 1 - distDiff / 40);
+
+    // Café bonus (10% weight)
+    const hasCafe = !!(route.cafe_name || '').trim();
+    const cafeScore = hasCafe ? 1 : 0;
+
+    // Recency — prefer routes not recently ridden (10% weight)
+    const lr = safe(route.last_ridden).toLowerCase().trim();
+    const recencyScore = lr === '' ? 0.8 : 0.5; // unridden gets slight boost
+
+    const total = (ws * 0.45) + (distScore * 0.35) + (cafeScore * 0.10) + (recencyScore * 0.10);
+    const matchPct = Math.round(Math.max(0, Math.min(100, (total + 1) / 2 * 100)));
+    const wl = windLabel(ws);
+
+    return { ...route, matchPct, windScore: ws, windLabelText: wl.text, windLabelCls: wl.cls };
+  }).sort((a, b) => b.matchPct - a.matchPct);
+}
+
+function formatDateNice(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch(e) { return dateStr; }
+}
+
+function buildWindCompassSVG(windDir) {
+  // Arrow points in the direction wind is blowing TO (windDir + 180)
+  const rotation = windDir; // arrow shows where wind comes FROM (pointing down = from north)
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(44,188,179,0.3)" stroke-width="2" stroke-dasharray="8 4"/>
+    <text x="50" y="14" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">N</text>
+    <text x="50" y="96" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">S</text>
+    <text x="8" y="54" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">W</text>
+    <text x="92" y="54" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">E</text>
+    <g transform="rotate(${rotation} 50 50)">
+      <line x1="50" y1="18" x2="50" y2="70" stroke="#2CBCB3" stroke-width="3" stroke-linecap="round"/>
+      <polygon points="50,16 44,28 56,28" fill="#2CBCB3"/>
+    </g>
+  </svg>`;
+}
+
+function renderRidePlanner(weather, routes) {
+  const heading = document.getElementById('plannerHeading');
+  const advice = document.getElementById('plannerAdvice');
+  const picksContainer = document.getElementById('plannerPicks');
+  const weatherCard = document.getElementById('plannerWeatherCard');
+  const plannerDistSlider = document.getElementById('plannerDist');
+
+  if (!weather || !weather.sunday) {
+    if (advice) advice.textContent = 'Weather data unavailable — showing routes by distance match only.';
+    if (weatherCard) weatherCard.innerHTML = '<div class="planner-no-weather">Weather unavailable</div>';
+    // Still show top picks by distance
+    const targetDist = state.targetDistance || 40;
+    const sorted = routes.slice().sort((a, b) => {
+      return Math.abs(safeNum(a.distance_miles) - targetDist) - Math.abs(safeNum(b.distance_miles) - targetDist);
+    }).slice(0, 3);
+    renderPickCards(sorted, picksContainer);
+    return;
+  }
+
+  const sunday = weather.sunday;
+
+  // Update heading
+  if (heading) heading.textContent = `This ${sunday.dayName}'s Ride`;
+
+  // Wind direction advice
+  const windFromLabel = sunday.windDirLabel;
+  // The optimal outbound direction is INTO the wind (so you have tailwind home)
+  const optimalOutbound = degreesToCompass(sunday.windDir); // ride INTO wind = wind direction
+  const optimalReturn = degreesToCompass((sunday.windDir + 180) % 360);
+  if (advice) {
+    advice.innerHTML = `Wind from the <strong>${escHtml(windFromLabel)}</strong> at <strong>${sunday.windSpeed} mph</strong> — `
+      + `head <strong>${escHtml(optimalOutbound)}</strong> outbound for a tailwind home.`;
+  }
+
+  // Weather card
+  if (weatherCard) {
+    weatherCard.innerHTML = `
+      <div class="planner-weather-day">${escHtml(sunday.dayName)}</div>
+      <div class="planner-weather-date">${formatDateNice(sunday.date)}</div>
+      <div class="planner-weather-icon">${sunday.icon}</div>
+      <div class="planner-weather-desc">${escHtml(sunday.desc)}</div>
+      <div class="planner-weather-stats">
+        <div>
+          <div class="planner-weather-stat-val">${sunday.tempMax}°<span style="font-size:0.7rem;color:rgba(255,255,255,0.4)">/${sunday.tempMin}°</span></div>
+          <div class="planner-weather-stat-label">Temperature</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val">${sunday.windSpeed}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)"> mph</span></div>
+          <div class="planner-weather-stat-label">Wind ${escHtml(windFromLabel)}</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val">${sunday.rainProb}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)">%</span></div>
+          <div class="planner-weather-stat-label">Rain chance</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val" style="font-size:0.85rem">${escHtml(sunday.desc)}</div>
+          <div class="planner-weather-stat-label">Outlook</div>
+        </div>
+      </div>
+      <div class="wind-compass-wrap" title="Wind from ${escHtml(windFromLabel)}">
+        ${buildWindCompassSVG(sunday.windDir)}
+      </div>
+    `;
+  }
+
+  // Score and render top picks
+  const targetDist = state.targetDistance || 40;
+  const scored = scoreSundayRoutes(routes, weather, targetDist);
+  renderPickCards(scored.slice(0, 3), picksContainer);
+
+  // Bind slider events
+  if (plannerDistSlider && !plannerDistSlider._bound) {
+    plannerDistSlider._bound = true;
+    plannerDistSlider.addEventListener('input', function() {
+      state.targetDistance = parseInt(this.value, 10);
+      const valEl = document.getElementById('plannerDistVal');
+      if (valEl) valEl.textContent = state.targetDistance + ' mi';
+      const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance);
+      renderPickCards(scored2.slice(0, 3), document.getElementById('plannerPicks'));
+    });
+  }
+}
+
+function renderPickCards(picks, container) {
+  if (!container) return;
+  if (!picks || picks.length === 0) {
+    container.innerHTML = '<div class="planner-no-weather">No routes match your criteria</div>';
+    return;
+  }
+
+  container.innerHTML = picks.map(route => {
+    const slug = slugify(route.route_name);
+    const dist = safeNum(route.distance_miles);
+    const dir = normaliseDir(route.direction);
+    const cafe = safe(route.cafe_name);
+    const matchPct = route.matchPct || 0;
+    const windCls = route.windLabelCls || 'pick-wind-cross';
+    const windText = route.windLabelText || 'Unknown';
+
+    return `<div class="pick-card" onclick="window.scrollToCard('${slug}')">
+      <div class="pick-card-match">${matchPct}% match</div>
+      <div class="pick-card-name">${escHtml(safe(route.route_name))}</div>
+      <div class="pick-card-meta">
+        <span>${dist} mi</span>
+        <span>${escHtml(dir)}</span>
+        <span>${escHtml(safe(route.type))}</span>
+      </div>
+      <div class="pick-card-wind ${windCls}">${escHtml(windText)}</div>
+      ${cafe ? `<div class="pick-card-cafe">☕ ${escHtml(cafe)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FIND MY RIDE — Smart Scoring Engine
+   ════════════════════════════════════════════════════════════════════ */
+function initFindMyRide() {
+  const toggle = document.getElementById('findRideToggle');
+  const panel = document.getElementById('findMyRide');
+  const distSlider = document.getElementById('fmrDist');
+  const distVal = document.getElementById('fmrDistVal');
+  const timeSlider = document.getElementById('fmrTime');
+  const timeVal = document.getElementById('fmrTimeVal');
+  const searchBtn = document.getElementById('fmrSearch');
+  const resetBtn = document.getElementById('fmrReset');
+  const resultMsg = document.getElementById('fmrResultMsg');
+
+  if (!toggle || !panel) return;
+
+  // Toggle open/close
+  toggle.addEventListener('click', () => {
+    panel.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', panel.classList.contains('open'));
+  });
+
+  // Slider updates
+  distSlider.addEventListener('input', () => {
+    distVal.textContent = distSlider.value + ' mi';
+  });
+  timeSlider.addEventListener('input', () => {
+    const v = parseFloat(timeSlider.value);
+    timeVal.textContent = v === 1 ? '1 hr' : v % 1 === 0 ? v + ' hrs' : v + ' hrs';
+  });
+
+  // Option button groups
+  document.querySelectorAll('.find-ride-options').forEach(group => {
+    group.querySelectorAll('.find-ride-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.find-ride-opt').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-checked', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-checked', 'true');
+      });
+    });
+  });
+
+  // Search action
+  searchBtn.addEventListener('click', () => {
+    const prefs = getFindMyRidePrefs();
+    applyFindMyRide(prefs);
+  });
+
+  // Reset
+  resetBtn.addEventListener('click', () => {
+    distSlider.value = 40;
+    distVal.textContent = '40 mi';
+    timeSlider.value = 3;
+    timeVal.textContent = '3 hrs';
+    // Reset all option groups to first option
+    document.querySelectorAll('.find-ride-options').forEach(group => {
+      group.querySelectorAll('.find-ride-opt').forEach((btn, i) => {
+        btn.classList.toggle('active', i === 0 || (group.id === 'fmrDifficulty' && btn.dataset.val === 'moderate'));
+        btn.setAttribute('aria-checked', btn.classList.contains('active'));
+      });
+    });
+    // Reset difficulty specifically to "moderate"
+    const diffGroup = document.getElementById('fmrDifficulty');
+    if (diffGroup) {
+      diffGroup.querySelectorAll('.find-ride-opt').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === 'moderate');
+        b.setAttribute('aria-checked', b.dataset.val === 'moderate' ? 'true' : 'false');
+      });
+    }
+    resultMsg.textContent = '';
+    // Re-sort to default
+    state.sort = 'name';
+    const sortSel = document.getElementById('sortSelect');
+    if (sortSel) sortSel.value = 'name';
+    applyFilters();
+  });
+}
+
+function getFindMyRidePrefs() {
+  return {
+    distance: parseInt(document.getElementById('fmrDist').value) || 40,
+    timeHours: parseFloat(document.getElementById('fmrTime').value) || 3,
+    cafe: getActiveVal('fmrCafe') || 'any',
+    difficulty: getActiveVal('fmrDifficulty') || 'moderate',
+    type: getActiveVal('fmrType') || 'any',
+    busway: getActiveVal('fmrBusway') || 'any',
+  };
+}
+
+function getActiveVal(groupId) {
+  const group = document.getElementById(groupId);
+  if (!group) return null;
+  const active = group.querySelector('.find-ride-opt.active');
+  return active ? active.dataset.val : null;
+}
+
+function scoreRouteForPrefs(route, prefs) {
+  const dist = parseFloat(route.distance_miles) || 0;
+  const ascent = parseFloat(route.ascent_metres) || 0;
+  const hasCafe = !!(route.cafe_name || '').trim();
+  const routeType = (safe(route.type) || 'Road').trim();
+  const isBusway = (route.busway_segment === true || route.busway_segment === 'TRUE');
+  const lr = safe(route.last_ridden).toLowerCase().trim();
+
+  let score = 0;
+
+  // 1. Distance fit (25% weight) — gaussian around target
+  const distDiff = Math.abs(dist - prefs.distance);
+  const distScore = Math.exp(-(distDiff * distDiff) / (2 * 15 * 15)); // σ = 15
+  score += 0.25 * distScore;
+
+  // 2. Wind alignment (25% weight, if weather available)
+  let windScore = 0.5; // neutral default
+  if (weatherData && weatherData.sunday) {
+    const dir = normaliseDir(route.direction);
+    const ws = windAlignmentScore(dir, weatherData.sunday);
+    windScore = (ws + 1) / 2; // normalise from [-1,1] to [0,1]
+  }
+  score += 0.25 * windScore;
+
+  // 3. Café match (15% weight)
+  if (prefs.cafe === 'yes') {
+    score += 0.15 * (hasCafe ? 1 : 0);
+  } else if (prefs.cafe === 'no') {
+    score += 0.15 * (hasCafe ? 0.3 : 1); // slight penalty for café routes
+  } else {
+    score += 0.15 * 0.8; // "any" — mild positive
+  }
+
+  // 4. Difficulty/ascent match (15% weight)
+  let ascentTarget, ascentSigma;
+  if (prefs.difficulty === 'easy') {
+    ascentTarget = 100; ascentSigma = 80;
+  } else if (prefs.difficulty === 'hard') {
+    ascentTarget = 500; ascentSigma = 200;
+  } else {
+    ascentTarget = 250; ascentSigma = 120;
+  }
+  const ascentDiff = Math.abs(ascent - ascentTarget);
+  const ascentScore = Math.exp(-(ascentDiff * ascentDiff) / (2 * ascentSigma * ascentSigma));
+  score += 0.15 * ascentScore;
+
+  // 5. Time fit (10% weight) — estimate ride time from distance at ~15mph avg
+  const estHours = dist / 15;
+  const timeDiff = Math.abs(estHours - prefs.timeHours);
+  const timeScore = Math.exp(-(timeDiff * timeDiff) / (2 * 1.2 * 1.2));
+  score += 0.10 * timeScore;
+
+  // 6. Recency — prefer unridden routes (10% weight)
+  const recencyScore = lr === '' ? 0.9 : 0.4;
+  score += 0.10 * recencyScore;
+
+  // Type filter (hard filter, not scored)
+  if (prefs.type !== 'any' && routeType.toLowerCase() !== prefs.type.toLowerCase()) {
+    score *= 0.15; // heavy penalty but don't zero out entirely
+  }
+
+  // Busway filter
+  if (prefs.busway === 'avoid' && isBusway) {
+    score *= 0.3;
+  }
+
+  return Math.round(Math.max(0, Math.min(100, score * 100)));
+}
+
+function applyFindMyRide(prefs) {
+  // Score all routes — attach fmrScore to each route object
+  allRoutes.forEach(route => {
+    route.fmrScore = scoreRouteForPrefs(route, prefs);
+  });
+
+  // Override sort to show by match score
+  state.sort = 'fmr_score';
+  const sortSel = document.getElementById('sortSelect');
+  if (sortSel) {
+    // Add the option if it doesn't exist
+    if (!sortSel.querySelector('option[value="fmr_score"]')) {
+      const opt = document.createElement('option');
+      opt.value = 'fmr_score';
+      opt.textContent = 'Best match';
+      sortSel.insertBefore(opt, sortSel.firstChild);
+    }
+    sortSel.value = 'fmr_score';
+  }
+
+  // Re-run filters (which will now sort by fmr_score)
+  applyFilters();
+
+  // After filters run, update match scores on visible cards
+  filteredRoutes.forEach(route => {
+    const slug = slugify(route.route_name);
+    const card = document.getElementById('route-' + slug);
+    if (card) {
+      const matchEl = card.querySelector('.card-match-score');
+      if (matchEl) {
+        matchEl.innerHTML = `<span class="match-num">${escHtml(String(route.fmrScore))}%</span> match`;
+      }
+    }
+  });
+
+  const msg = document.getElementById('fmrResultMsg');
+  if (msg) {
+    const topScore = filteredRoutes[0] ? filteredRoutes[0].fmrScore : 0;
+    msg.textContent = `${filteredRoutes.length} routes scored — best match ${topScore}%`;
+  }
+
+  // Scroll to results
+  const listTab = document.querySelector('.view-tabs');
+  if (listTab) listTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ROUTE COMPARISON
+   ════════════════════════════════════════════════════════════════════ */
+const compareSet = new Set(); // slugs of selected routes (max 3)
+const COMPARE_COLORS = ['#2CBCB3', '#f59e0b', '#8b5cf6']; // teal, amber, purple
+
+function toggleCompare(slug) {
+  if (compareSet.has(slug)) {
+    compareSet.delete(slug);
+  } else {
+    if (compareSet.size >= 3) return; // max 3
+    compareSet.add(slug);
+  }
+  updateCompareUI();
+}
+window.toggleCompare = toggleCompare;
+
+function updateCompareUI() {
+  // Update toggle buttons on cards
+  document.querySelectorAll('.compare-toggle').forEach(btn => {
+    const slug = btn.id.replace('cmp-', '');
+    const active = compareSet.has(slug);
+    btn.classList.toggle('active', active);
+    const check = btn.querySelector('.compare-check');
+    if (check) check.textContent = active ? '✓' : '';
+  });
+
+  // Update floating bar
+  const bar = document.getElementById('compareBar');
+  const chips = document.getElementById('compareChips');
+  const btn = document.getElementById('compareBtn');
+
+  if (compareSet.size > 0) {
+    bar.classList.add('visible');
+    chips.innerHTML = Array.from(compareSet).map(slug => {
+      const route = allRoutes.find(r => slugify(r.route_name) === slug);
+      const name = route ? escHtml(safe(route.route_name)) : slug;
+      return `<span class="compare-chip">
+        ${name}
+        <button class="compare-chip-remove" onclick="toggleCompare('${slug}')" aria-label="Remove ${name}">✕</button>
+      </span>`;
+    }).join('');
+    btn.disabled = compareSet.size < 2;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function initCompare() {
+  const compareBtn = document.getElementById('compareBtn');
+  const closeBtn = document.getElementById('compareClose');
+  const overlay = document.getElementById('compareOverlay');
+
+  if (compareBtn) {
+    compareBtn.addEventListener('click', () => {
+      if (compareSet.size >= 2) showComparison();
+    });
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeComparison);
+  }
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeComparison();
+    });
+  }
+}
+
+function showComparison() {
+  const slugs = Array.from(compareSet);
+  const routes = slugs.map(slug => allRoutes.find(r => slugify(r.route_name) === slug)).filter(Boolean);
+  if (routes.length < 2) return;
+
+  const body = document.getElementById('compareBody');
+  const overlay = document.getElementById('compareOverlay');
+
+  // Build comparison table
+  const metrics = [
+    { label: 'Route', key: 'name' },
+    { label: 'Distance', key: 'distance', unit: ' mi', best: 'closest40' },
+    { label: 'Ascent', key: 'ascent', unit: ' m' },
+    { label: 'Type', key: 'type' },
+    { label: 'Direction', key: 'direction' },
+    { label: 'Ride time', key: 'time' },
+    { label: 'With coffee', key: 'coffee_time' },
+    { label: 'Café', key: 'cafe' },
+    { label: 'Wind', key: 'wind' },
+    { label: 'Match', key: 'match' },
+    { label: 'Busway', key: 'busway' },
+    { label: 'Last ridden', key: 'last_ridden' },
+  ];
+
+  const getCellVal = (route, key) => {
+    switch (key) {
+      case 'name': return escHtml(safe(route.route_name));
+      case 'distance': return safeNum(route.distance_miles) || '—';
+      case 'ascent': return safeNum(route.ascent_metres) || '—';
+      case 'type': return escHtml(safe(route.type) || '—');
+      case 'direction': return escHtml(normaliseDir(route.direction) || '—');
+      case 'time': return escHtml(safe(route.estimated_time) || '—');
+      case 'coffee_time': return escHtml(safe(route.time_with_coffee) || '—');
+      case 'cafe': return route.cafe_name ? escHtml(safe(route.cafe_name)) : '—';
+      case 'wind': {
+        if (!weatherData || !weatherData.sunday) return '—';
+        const ws = windAlignmentScore(normaliseDir(route.direction), weatherData.sunday);
+        const wl = windLabel(ws);
+        return `<span class="compare-wind-cell ${wl.cls.replace('pick-', 'card-wind-badge ')}">${escHtml(wl.text)}</span>`;
+      }
+      case 'match': {
+        if (route.fmrScore !== undefined) return route.fmrScore + '%';
+        if (!weatherData || !weatherData.sunday) return '—';
+        const dir = normaliseDir(route.direction);
+        const ws = windAlignmentScore(dir, weatherData.sunday);
+        const dist = safeNum(route.distance_miles);
+        const targetDist = state.targetDistance || CONFIG.TARGET_DISTANCE || 40;
+        const distDiff = Math.abs(dist - targetDist);
+        const distScore = Math.max(0, 1 - distDiff / 40);
+        const hasCafe = !!(route.cafe_name || '').trim();
+        const lr = safe(route.last_ridden).toLowerCase().trim();
+        const total = (ws * 0.45) + (distScore * 0.35) + ((hasCafe ? 1 : 0) * 0.10) + ((lr === '' ? 0.8 : 0.5) * 0.10);
+        return Math.round(Math.max(0, Math.min(100, (total + 1) / 2 * 100))) + '%';
+      }
+      case 'busway': return (route.busway_segment === true || route.busway_segment === 'TRUE') ? 'Yes' : 'No';
+      case 'last_ridden': return escHtml(safe(route.last_ridden) || 'Never');
+      default: return '—';
+    }
+  };
+
+  let tableHtml = '<table class="compare-table"><tbody>';
+
+  metrics.forEach(metric => {
+    tableHtml += '<tr>';
+    tableHtml += `<th>${escHtml(metric.label)}</th>`;
+    routes.forEach((route, i) => {
+      const val = getCellVal(route, metric.key);
+      const unit = (metric.unit && val !== '—') ? metric.unit : '';
+      const cls = metric.key === 'name' ? ' class="compare-route-name"' : '';
+      tableHtml += `<td${cls}>${val}${unit}</td>`;
+    });
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table>';
+
+  // Add elevation comparison chart area
+  tableHtml += `
+    <div class="compare-elev-wrap">
+      <div class="compare-elev-title">Elevation Profiles (overlaid)</div>
+      <div class="compare-elev-chart">
+        <canvas id="compareElevChart"></canvas>
+      </div>
+    </div>`;
+
+  body.innerHTML = tableHtml;
+  overlay.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+
+  // Load elevation data for comparison chart
+  loadCompareElevations(routes);
+}
+
+function loadCompareElevations(routes) {
+  const canvas = document.getElementById('compareElevChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  const datasets = [];
+  let loaded = 0;
+
+  routes.forEach((route, i) => {
+    if (!route.gpx_url) {
+      loaded++;
+      if (loaded === routes.length) renderCompareChart(canvas, datasets);
+      return;
+    }
+
+    fetch(route.gpx_url)
+      .then(r => r.text())
+      .then(gpxText => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(gpxText, 'text/xml');
+        const trkpts = doc.querySelectorAll('trkpt');
+        const elevations = [];
+        trkpts.forEach(pt => {
+          const ele = pt.querySelector('ele');
+          if (ele) elevations.push(parseFloat(ele.textContent));
+        });
+
+        if (elevations.length > 0) {
+          // Downsample to 100 points for smooth chart
+          const sampled = downsample(elevations, 100);
+          datasets.push({
+            label: safe(route.route_name),
+            data: sampled,
+            borderColor: COMPARE_COLORS[i % COMPARE_COLORS.length],
+            backgroundColor: COMPARE_COLORS[i % COMPARE_COLORS.length] + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            borderWidth: 2,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        loaded++;
+        if (loaded === routes.length) renderCompareChart(canvas, datasets);
+      });
+  });
+}
+
+function downsample(arr, targetLen) {
+  if (arr.length <= targetLen) return arr;
+  const step = arr.length / targetLen;
+  const result = [];
+  for (let i = 0; i < targetLen; i++) {
+    const idx = Math.floor(i * step);
+    result.push(arr[idx]);
+  }
+  return result;
+}
+
+function renderCompareChart(canvas, datasets) {
+  if (datasets.length === 0) {
+    canvas.parentElement.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--grey-300);font-size:0.82rem">No GPX elevation data available for these routes</div>';
+    return;
+  }
+
+  const labels = datasets[0].data.map((_, i) => Math.round(i / datasets[0].data.length * 100) + '%');
+
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { usePointStyle: true, padding: 12, font: { size: 11, family: "'Inter', sans-serif" } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}m`
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: { display: true, text: '% of route', font: { size: 10 } },
+          ticks: { maxTicksToShow: 5, font: { size: 9 } },
+          grid: { display: false }
+        },
+        y: {
+          display: true,
+          title: { display: true, text: 'Elevation (m)', font: { size: 10 } },
+          ticks: { font: { size: 9 } },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
+}
+
+function closeComparison() {
+  document.getElementById('compareOverlay').classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+/* ════════════════════════════════════════════════════════════════════
    RENDER
    ════════════════════════════════════════════════════════════════════ */
 function renderCards() {
@@ -1636,6 +3471,49 @@ function buildCard(route, idx) {
   const ascent = parseFloat(route.ascent_metres) || 0;
   const gpxDisabled = !route.gpx_url ? 'disabled data-tip="GPX not yet available"' : '';
   const garminDisabled = !route.garmin_link ? 'style="display:none"' : '';
+
+  // Weather-aware row
+  let weatherRowHtml = '';
+  if (weatherData && weatherData.sunday) {
+    const sun = weatherData.sunday;
+    const dir = normaliseDir(route.direction);
+    const ws = windAlignmentScore(dir, sun);
+    const wl = windLabel(ws);
+
+    // Calculate match score (same weights as scoreSundayRoutes)
+    const targetDist = state.targetDistance || CONFIG.TARGET_DISTANCE || 40;
+    const distDiff = Math.abs(dist - targetDist);
+    const distScore = Math.max(0, 1 - distDiff / 40);
+    const hasCafe = !!(route.cafe_name || '').trim();
+    const cafeScore = hasCafe ? 1 : 0;
+    const lr = safe(route.last_ridden).toLowerCase().trim();
+    const recencyScore = lr === '' ? 0.8 : 0.5;
+    const total = (ws * 0.45) + (distScore * 0.35) + (cafeScore * 0.10) + (recencyScore * 0.10);
+    const matchPct = Math.round(Math.max(0, Math.min(100, (total + 1) / 2 * 100)));
+
+    // Wind direction mini arrow SVG
+    const windBlowTo = (sun.windDir + 180) % 360;
+    const windArrowSvg = `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g transform="rotate(${windBlowTo}, 8, 8)">
+        <line x1="8" y1="13" x2="8" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="5,6 8,3 11,6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>`;
+
+    const windDotHtml = ws > 0.7 ? '🟢' : ws > 0.25 ? '🟡' : ws > -0.25 ? '🟠' : '🔴';
+
+    weatherRowHtml = `
+      <div class="card-weather-row">
+        <span class="card-weather-icon">${escHtml(sun.icon)}</span>
+        <span class="card-weather-temp">${escHtml(String(sun.tempMax))}°C</span>
+        <span class="card-weather-wind">
+          ${windArrowSvg}
+          ${escHtml(sun.windDirLabel)} ${escHtml(String(sun.windSpeed))} mph
+        </span>
+        <span class="card-wind-badge ${wl.cls}">${windDotHtml} ${escHtml(wl.text)}</span>
+        <span class="card-match-score"><span class="match-num">${matchPct}%</span> match</span>
+      </div>`;
+  }
 
   const rw = hasRoadwork(safe(route.notes));
   const warningHtml = safe(route.notes) ? `
@@ -1680,6 +3558,8 @@ function buildCard(route, idx) {
           </div>
         </div>
 
+        ${weatherRowHtml}
+
         <div class="card-meta">
           <div class="meta-item">
             <div class="meta-key">⏱ Ride time</div>
@@ -1710,6 +3590,9 @@ function buildCard(route, idx) {
           </a>
           ${route.garmin_link ? `<a class="action-btn btn-garmin" href="${escHtml(route.garmin_link)}" target="_blank" rel="noopener noreferrer">🔗 Garmin Connect</a>` : ''}
           <button class="action-btn btn-share" onclick="shareRoute('${slug}')" title="Copy share link">🔗 Share</button>
+          <button class="compare-toggle" onclick="toggleCompare('${slug}')" id="cmp-${slug}" title="Add to comparison">
+            <span class="compare-check"></span> Compare
+          </button>
         </div>
       </div>
 
@@ -2371,6 +4254,8 @@ window.switchView   = switchView;
 
 async function init() {
   initControls();
+  initFindMyRide();
+  initCompare();
   // Show debug panel only if flag is set
   if (CONFIG.SHOW_DEBUG) {
     const dp = document.getElementById('debugPanel');
@@ -2378,8 +4263,20 @@ async function init() {
   }
   dbg('App initialising...');
   try {
-    allRoutes = await fetchRoutes();
-    allCafes  = await fetchCafes();
+    // Fetch routes, cafes and weather in parallel
+    const [routes, cafes, weather] = await Promise.all([
+      fetchRoutes(),
+      fetchCafes(),
+      fetchWeather().catch(e => { dbg(`Weather failed: ${e.message}`, false); return null; }),
+    ]);
+    allRoutes = routes;
+    allCafes  = cafes;
+    weatherData = weather;
+
+    // Render weather strip + ride planner
+    renderWeatherStrip(weatherData);
+    renderRidePlanner(weatherData, allRoutes);
+
     dbg(`init complete — ${allRoutes.length} routes, ${allCafes.length} cafes loaded`, allRoutes.length > 0);
     applyFilters();
   } catch (err) {
