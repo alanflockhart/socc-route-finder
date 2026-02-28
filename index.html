@@ -1114,7 +1114,13 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 0.75rem;
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 0.25rem;
     }
+    .planner-picks::-webkit-scrollbar { width: 4px; }
+    .planner-picks::-webkit-scrollbar-thumb { background: rgba(44,188,179,0.3); border-radius: 2px; }
+    .planner-picks::-webkit-scrollbar-track { background: transparent; }
     .pick-card {
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
@@ -1768,7 +1774,7 @@
         <span class="planner-slider-val" id="plannerDistVal">40 mi</span>
       </div>
 
-      <div class="planner-picks-title">Top picks for Sunday</div>
+      <div class="planner-picks-title">Routes ranked for Sunday</div>
       <div class="planner-picks" id="plannerPicks">
         <div class="planner-no-weather">Waiting for data...</div>
       </div>
@@ -2767,9 +2773,10 @@ const DIR_TO_BEARING = { N:0, NE:45, E:90, SE:135, S:180, SW:225, W:270, NW:315 
 function windAlignmentScore(routeDir, sundayWeather) {
   if (!sundayWeather) return 0;
   const routeBearing = DIR_TO_BEARING[normaliseDir(routeDir)] ?? 180;
-  const returnBearing = (routeBearing + 180) % 360;
   const windFrom = sundayWeather.windDir; // degrees wind is coming FROM
-  let angleDiff = Math.abs(returnBearing - windFrom);
+  // Tailwind home = outbound direction matches where wind comes from
+  // (ride INTO wind outbound, wind pushes you home on return)
+  let angleDiff = Math.abs(routeBearing - windFrom);
   if (angleDiff > 180) angleDiff = 360 - angleDiff;
   return Math.cos(angleDiff * Math.PI / 180); // 1.0 = perfect tailwind home, -1.0 = headwind home
 }
@@ -2901,10 +2908,10 @@ function renderRidePlanner(weather, routes) {
     `;
   }
 
-  // Score and render top picks
+  // Score and render all picks (sorted by match)
   const targetDist = state.targetDistance || 40;
   const scored = scoreSundayRoutes(routes, weather, targetDist);
-  renderPickCards(scored.slice(0, 3), picksContainer);
+  renderPickCards(scored, picksContainer);
 
   // Bind slider events
   if (plannerDistSlider && !plannerDistSlider._bound) {
@@ -2914,7 +2921,7 @@ function renderRidePlanner(weather, routes) {
       const valEl = document.getElementById('plannerDistVal');
       if (valEl) valEl.textContent = state.targetDistance + ' mi';
       const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance);
-      renderPickCards(scored2.slice(0, 3), document.getElementById('plannerPicks'));
+      renderPickCards(scored2, document.getElementById('plannerPicks'));
     });
   }
 }
