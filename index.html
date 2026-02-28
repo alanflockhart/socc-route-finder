@@ -1114,13 +1114,7 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 0.75rem;
-      max-height: 520px;
-      overflow-y: auto;
-      padding-right: 0.25rem;
     }
-    .planner-picks::-webkit-scrollbar { width: 4px; }
-    .planner-picks::-webkit-scrollbar-thumb { background: rgba(44,188,179,0.3); border-radius: 2px; }
-    .planner-picks::-webkit-scrollbar-track { background: transparent; }
     .pick-card {
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
@@ -1774,7 +1768,7 @@
         <span class="planner-slider-val" id="plannerDistVal">40 mi</span>
       </div>
 
-      <div class="planner-picks-title">Routes ranked for Sunday</div>
+      <div class="planner-picks-title">Top picks for Sunday</div>
       <div class="planner-picks" id="plannerPicks">
         <div class="planner-no-weather">Waiting for data...</div>
       </div>
@@ -2908,10 +2902,10 @@ function renderRidePlanner(weather, routes) {
     `;
   }
 
-  // Score and render all picks (sorted by match)
+  // Score all routes, show top 3 picks
   const targetDist = state.targetDistance || 40;
   const scored = scoreSundayRoutes(routes, weather, targetDist);
-  renderPickCards(scored, picksContainer);
+  renderPickCards(scored.slice(0, 3), picksContainer);
 
   // Bind slider events
   if (plannerDistSlider && !plannerDistSlider._bound) {
@@ -2921,7 +2915,7 @@ function renderRidePlanner(weather, routes) {
       const valEl = document.getElementById('plannerDistVal');
       if (valEl) valEl.textContent = state.targetDistance + ' mi';
       const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance);
-      renderPickCards(scored2, document.getElementById('plannerPicks'));
+      renderPickCards(scored2.slice(0, 3), document.getElementById('plannerPicks'));
     });
   }
 }
