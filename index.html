@@ -635,6 +635,37 @@
       font-size: 0.92rem;
     }
 
+    /* Road closure alerts */
+    .card-closure-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin: 0.4rem 0 0.2rem;
+      padding: 0.5rem 0.75rem;
+      background: rgba(239,68,68,0.06);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(239,68,68,0.18);
+      font-size: 0.75rem;
+      color: #b91c1c;
+    }
+    .card-closure-row.clear {
+      background: rgba(16,185,129,0.06);
+      border-color: rgba(16,185,129,0.18);
+      color: #059669;
+    }
+    .closure-icon { font-size: 0.9rem; flex-shrink: 0; margin-top: 0.05rem; }
+    .closure-details { flex: 1; }
+    .closure-item { margin-bottom: 0.3rem; line-height: 1.35; }
+    .closure-item:last-child { margin-bottom: 0; }
+    .closure-desc { font-weight: 600; }
+    .closure-dates { font-size: 0.68rem; color: var(--grey-500); }
+    .closure-loading {
+      font-size: 0.72rem;
+      color: var(--grey-400);
+      padding: 0.3rem 0;
+      font-style: italic;
+    }
+
     .card-meta {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -887,13 +918,22 @@
       border: 1px solid rgba(255,255,255,0.06);
       text-align: center;
       transition: all var(--transition);
-      cursor: default;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 130px;
     }
     .weather-day:hover {
       background: rgba(44,188,179,0.08);
       border-color: rgba(44,188,179,0.2);
     }
     .weather-day.sunday-highlight {
+      background: rgba(44,188,179,0.06);
+      border-color: rgba(44,188,179,0.35);
+    }
+    .weather-day.day-selected {
       background: rgba(44,188,179,0.12);
       border-color: var(--teal);
       box-shadow: 0 0 12px rgba(44,188,179,0.15);
@@ -907,6 +947,7 @@
       margin-bottom: 0.3rem;
     }
     .weather-day.sunday-highlight .weather-day-name { color: var(--teal-light); }
+    .weather-day.day-selected .weather-day-name { color: var(--teal-light); font-size: 0.72rem; }
     .weather-day-icon { font-size: 1.4rem; line-height: 1; margin-bottom: 0.25rem; }
     .weather-day-temp {
       font-size: 0.85rem;
@@ -1678,6 +1719,40 @@
       .card-meta { grid-template-columns: repeat(2, 1fr); }
     }
 
+    /* ─── MOBILE QUICK ACTIONS BAR ──────────────────────────────── */
+    .mobile-quick-actions {
+      display: none; /* hidden on desktop */
+    }
+    @media (max-width: 800px) {
+      .mobile-quick-actions {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.6rem 0;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .mobile-quick-actions .quick-btn {
+        font-size: 0.78rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 1px solid rgba(44,188,179,0.35);
+        background: rgba(44,188,179,0.08);
+        color: #b0bec5;
+        cursor: pointer;
+        font-family: var(--font-main);
+        font-weight: 500;
+        transition: all 0.2s ease;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .mobile-quick-actions .quick-btn:hover,
+      .mobile-quick-actions .quick-btn:active {
+        background: rgba(44,188,179,0.18);
+        border-color: #2CBCB3;
+        color: #ffffff;
+      }
+    }
+
     /* Hash highlight animation */
     @keyframes highlightPulse {
       0%   { box-shadow: 0 0 0 4px var(--teal); }
@@ -1768,7 +1843,7 @@
         <span class="planner-slider-val" id="plannerDistVal">40 mi</span>
       </div>
 
-      <div class="planner-picks-title">Top picks for Sunday</div>
+      <div class="planner-picks-title" id="plannerPicksTitle">Top picks for Sunday</div>
       <div class="planner-picks" id="plannerPicks">
         <div class="planner-no-weather">Waiting for data...</div>
       </div>
@@ -1989,6 +2064,12 @@
   <!-- Cards / Map -->
   <section class="cards-area">
 
+    <!-- Mobile quick actions (visible only on small screens) -->
+    <div class="mobile-quick-actions">
+      <button class="quick-btn" onclick="resetFilters()">↺ Reset filters</button>
+      <button class="quick-btn" onclick="clearCache()">🔄 Refresh data</button>
+    </div>
+
     <!-- View toggle tabs -->
     <div class="view-tabs">
       <button class="view-tab active" id="tabList" onclick="switchView('list')">📋 List</button>
@@ -2057,6 +2138,8 @@ const CONFIG = {
   WEATHER_ENABLED: true,         // true = fetch 7-day forecast from Open-Meteo
   DEFAULT_RIDE_DAY: 'sunday',    // day the club typically rides
   TARGET_DISTANCE: 40,           // default target distance in miles for ride planner
+  TOMTOM_API_KEY: '',            // TomTom Traffic API key (free at developer.tomtom.com). Empty = road closures disabled.
+  ROAD_CLOSURES_ENABLED: false,  // set true + add TOMTOM_API_KEY to enable road closure checking
 
   // Maps your actual sheet column headers → internal app field names (all lowercase keys)
   COLUMN_MAP: {
@@ -2368,6 +2451,189 @@ async function fetchWeather() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   ROAD CLOSURES — TomTom Traffic Incidents API
+   Checks GPX route coordinates against nearby roadworks/closures
+   ════════════════════════════════════════════════════════════════════ */
+const CLOSURE_CACHE_KEY = 'socc_closures_cache';
+const CLOSURE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const closureCache = {}; // in-memory cache keyed by route slug
+
+/**
+ * Check road closures along a GPX route.
+ * Samples points from the GPX coordinates, queries TomTom for incidents
+ * near each sample, and returns any roadworks/closures within ~200m of the route.
+ */
+async function checkRouteClosure(gpxUrl, slug) {
+  if (!CONFIG.ROAD_CLOSURES_ENABLED || !CONFIG.TOMTOM_API_KEY) return null;
+
+  // Check in-memory cache first
+  if (closureCache[slug] && (Date.now() - closureCache[slug].ts < CLOSURE_CACHE_TTL)) {
+    return closureCache[slug].data;
+  }
+
+  try {
+    // Fetch and parse GPX to extract route coordinates
+    const resp = await fetch(gpxUrl);
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    const parser = new DOMParser();
+    const gpxDoc = parser.parseFromString(text, 'application/xml');
+
+    // Extract trackpoints
+    const trkpts = gpxDoc.querySelectorAll('trkpt');
+    if (!trkpts.length) return null;
+
+    // Sample every Nth point to keep API calls reasonable (max ~10 samples per route)
+    const step = Math.max(1, Math.floor(trkpts.length / 10));
+    const samples = [];
+    for (let i = 0; i < trkpts.length; i += step) {
+      const lat = parseFloat(trkpts[i].getAttribute('lat'));
+      const lon = parseFloat(trkpts[i].getAttribute('lon'));
+      if (!isNaN(lat) && !isNaN(lon)) samples.push({ lat, lon });
+    }
+    // Always include the last point
+    const lastPt = trkpts[trkpts.length - 1];
+    samples.push({
+      lat: parseFloat(lastPt.getAttribute('lat')),
+      lon: parseFloat(lastPt.getAttribute('lon'))
+    });
+
+    // Calculate the bounding box of the route with a ~500m buffer
+    const BUFFER = 0.005; // roughly 500m in degrees at UK latitudes
+    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    for (const s of samples) {
+      if (s.lat < minLat) minLat = s.lat;
+      if (s.lat > maxLat) maxLat = s.lat;
+      if (s.lon < minLon) minLon = s.lon;
+      if (s.lon > maxLon) maxLon = s.lon;
+    }
+    minLat -= BUFFER; maxLat += BUFFER;
+    minLon -= BUFFER; maxLon += BUFFER;
+
+    // Query TomTom Traffic Incidents API
+    const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+    const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
+      + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
+      + `&bbox=${bbox}`
+      + `&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,description,from,to,startTime,endTime,delay,roadNumbers}}}`
+      + `&language=en-GB`
+      + `&categoryFilter=6,7,8,9,14`  // 6=RoadWork, 7=RoadClosure, 8=LaneClosure, 9=RoadClosedConstruction, 14=BrokenDownVehicle(skip)
+      + `&timeValidityFilter=present`;
+
+    const apiResp = await fetch(apiUrl);
+    if (!apiResp.ok) {
+      dbg(`TomTom API returned ${apiResp.status}`, false);
+      return null;
+    }
+    const data = await apiResp.json();
+
+    // Filter incidents that are close to the actual route (within ~200m)
+    const incidents = [];
+    if (data.incidents) {
+      for (const inc of data.incidents) {
+        const props = inc.properties || {};
+        const geom = inc.geometry || {};
+
+        // Check if any incident coordinate is near any route sample point
+        const incCoords = geom.coordinates || [];
+        let nearRoute = false;
+        for (const coord of incCoords) {
+          // coord = [lon, lat] in GeoJSON format
+          const incLon = Array.isArray(coord[0]) ? coord[0][0] : coord[0];
+          const incLat = Array.isArray(coord[0]) ? coord[0][1] : coord[1];
+          for (const s of samples) {
+            const dLat = Math.abs(incLat - s.lat);
+            const dLon = Math.abs(incLon - s.lon);
+            // ~200m threshold (approx 0.002 degrees at UK latitude)
+            if (dLat < 0.002 && dLon < 0.003) {
+              nearRoute = true;
+              break;
+            }
+          }
+          if (nearRoute) break;
+        }
+
+        if (nearRoute) {
+          const cat = props.iconCategory;
+          const isRoadwork = cat === 6 || cat === 9;
+          const isClosure = cat === 7 || cat === 8;
+          incidents.push({
+            type: isClosure ? 'closure' : isRoadwork ? 'roadwork' : 'incident',
+            description: escHtml(props.description || 'Road incident'),
+            from: escHtml(props.from || ''),
+            to: escHtml(props.to || ''),
+            startTime: props.startTime || null,
+            endTime: props.endTime || null,
+            roads: (props.roadNumbers || []).map(r => escHtml(r)).join(', '),
+          });
+        }
+      }
+    }
+
+    const result = {
+      closures: incidents.filter(i => i.type === 'closure'),
+      roadworks: incidents.filter(i => i.type === 'roadwork'),
+      total: incidents.length,
+      checked: new Date().toISOString()
+    };
+
+    // Cache result
+    closureCache[slug] = { data: result, ts: Date.now() };
+    return result;
+  } catch (e) {
+    dbg(`Road closure check failed: ${e.message}`, false);
+    return null;
+  }
+}
+
+/** Format a closure result for display in a card */
+function renderClosureHtml(closureData) {
+  if (!closureData) return '';
+
+  if (closureData.total === 0) {
+    return `<div class="card-closure-row clear">
+      <span class="closure-icon">✅</span>
+      <div class="closure-details">No road closures or roadworks detected on this route</div>
+    </div>`;
+  }
+
+  const items = [];
+  for (const c of closureData.closures) {
+    let dates = '';
+    if (c.startTime || c.endTime) {
+      const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short'}); } catch(e) { return ''; } };
+      const start = c.startTime ? fmt(c.startTime) : '';
+      const end = c.endTime ? fmt(c.endTime) : '';
+      dates = start && end ? ` (${start} – ${end})` : start ? ` (from ${start})` : end ? ` (until ${end})` : '';
+    }
+    items.push(`<div class="closure-item">
+      <span class="closure-desc">🚫 ${c.description}</span>
+      ${c.from || c.to ? `<br><span class="closure-dates">${c.from}${c.to ? ' → ' + c.to : ''}${dates}</span>` : dates ? `<br><span class="closure-dates">${dates}</span>` : ''}
+    </div>`);
+  }
+  for (const r of closureData.roadworks) {
+    let dates = '';
+    if (r.startTime || r.endTime) {
+      const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short'}); } catch(e) { return ''; } };
+      const start = r.startTime ? fmt(r.startTime) : '';
+      const end = r.endTime ? fmt(r.endTime) : '';
+      dates = start && end ? ` (${start} – ${end})` : start ? ` (from ${start})` : end ? ` (until ${end})` : '';
+    }
+    items.push(`<div class="closure-item">
+      <span class="closure-desc">🚧 ${r.description}</span>
+      ${r.from || r.to ? `<br><span class="closure-dates">${r.from}${r.to ? ' → ' + r.to : ''}${dates}</span>` : dates ? `<br><span class="closure-dates">${dates}</span>` : ''}
+    </div>`);
+  }
+
+  const icon = closureData.closures.length > 0 ? '⚠️' : '🚧';
+  const label = closureData.closures.length > 0 ? 'Road closure' : 'Roadworks';
+  return `<div class="card-closure-row">
+    <span class="closure-icon">${icon}</span>
+    <div class="closure-details">${items.join('')}</div>
+  </div>`;
+}
+
+/* ════════════════════════════════════════════════════════════════════
    STATE
    ════════════════════════════════════════════════════════════════════ */
 let allRoutes = [];
@@ -2386,6 +2652,7 @@ const state = {
   excludeBusway: false,
   sort: 'name',
   targetDistance: CONFIG.TARGET_DISTANCE,  // for ride planner
+  selectedDayIdx: null,  // index into weatherData.daily (null = default ride day)
 };
 
 /* ════════════════════════════════════════════════════════════════════
@@ -2742,11 +3009,15 @@ function renderWeatherStrip(weather) {
   }
 
   const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+  // Default selected day is the ride day (Sunday)
+  const selectedIdx = weather.daily.findIndex(d => d.dayName === rideDay);
 
-  strip.innerHTML = weather.daily.map(day => {
+  strip.innerHTML = weather.daily.map((day, idx) => {
     const isSunday = day.dayName === rideDay;
-    const windRotation = day.windDir; // degrees clockwise from N (direction wind is FROM)
-    return `<div class="weather-day${isSunday ? ' sunday-highlight' : ''}" title="${escHtml(day.desc)}">
+    const isSelected = idx === selectedIdx;
+    const windRotation = day.windDir;
+    return `<div class="weather-day${isSunday ? ' sunday-highlight' : ''}${isSelected ? ' day-selected' : ''}"
+      data-day-idx="${idx}" title="${escHtml(day.desc)} — click to plan rides for this day" role="button" tabindex="0">
       <div class="weather-day-name">${isSunday ? '&#9733; ' : ''}${escHtml(day.dayName.slice(0, 3))}</div>
       <div class="weather-day-icon">${day.icon}</div>
       <div class="weather-day-temp">${day.tempMax}° <span>${day.tempMin}°</span></div>
@@ -2754,15 +3025,106 @@ function renderWeatherStrip(weather) {
         <span class="wind-arrow" style="transform:rotate(${windRotation}deg)">↓</span>
         ${escHtml(day.windDirLabel)} ${day.windSpeed}
       </div>
-      <div class="weather-day-rain">${day.rainProb > 0 ? '💧 ' + day.rainProb + '%' : ''}</div>
+      <div class="weather-day-rain">${day.rainProb > 0 ? '💧 ' + day.rainProb + '%' : '&nbsp;'}</div>
     </div>`;
   }).join('');
+
+  // Bind click events on weather days
+  strip.querySelectorAll('.weather-day').forEach(el => {
+    el.addEventListener('click', function() {
+      const idx = parseInt(this.dataset.dayIdx, 10);
+      selectPlannerDay(idx);
+    });
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+    });
+  });
+}
+
+function selectPlannerDay(dayIdx) {
+  if (!weatherData || !weatherData.daily || !weatherData.daily[dayIdx]) return;
+  const selectedDay = weatherData.daily[dayIdx];
+  state.selectedDayIdx = dayIdx;
+
+  // Update the selected highlight on weather strip
+  document.querySelectorAll('.weather-day').forEach((el, i) => {
+    el.classList.toggle('day-selected', i === dayIdx);
+  });
+
+  // Re-render the planner for the selected day
+  renderRidePlannerForDay(selectedDay);
+
+  // Re-render route cards so their weather rows reflect the newly selected day
+  if (typeof renderCards === 'function') renderCards();
+}
+
+function renderRidePlannerForDay(dayData) {
+  const heading = document.getElementById('plannerHeading');
+  const advice = document.getElementById('plannerAdvice');
+  const picksContainer = document.getElementById('plannerPicks');
+  const weatherCard = document.getElementById('plannerWeatherCard');
+
+  if (heading) heading.textContent = `This ${dayData.dayName}'s Ride`;
+
+  // Update picks title
+  const picksTitle = document.getElementById('plannerPicksTitle');
+  if (picksTitle) picksTitle.textContent = `Top picks for ${dayData.dayName}`;
+
+  const windFromLabel = dayData.windDirLabel;
+  const optimalOutbound = degreesToCompass(dayData.windDir);
+  if (advice) {
+    advice.innerHTML = `Wind from the <strong>${escHtml(windFromLabel)}</strong> at <strong>${dayData.windSpeed} mph</strong> — `
+      + `head <strong>${escHtml(optimalOutbound)}</strong> outbound for a tailwind home.`;
+  }
+
+  if (weatherCard) {
+    weatherCard.innerHTML = `
+      <div class="planner-weather-day">${escHtml(dayData.dayName)}</div>
+      <div class="planner-weather-date">${formatDateNice(dayData.date)}</div>
+      <div class="planner-weather-icon">${dayData.icon}</div>
+      <div class="planner-weather-desc">${escHtml(dayData.desc)}</div>
+      <div class="planner-weather-stats">
+        <div>
+          <div class="planner-weather-stat-val">${dayData.tempMax}°<span style="font-size:0.7rem;color:rgba(255,255,255,0.4)">/${dayData.tempMin}°</span></div>
+          <div class="planner-weather-stat-label">Temperature</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val">${dayData.windSpeed}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)"> mph</span></div>
+          <div class="planner-weather-stat-label">Wind ${escHtml(windFromLabel)}</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val">${dayData.rainProb}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)">%</span></div>
+          <div class="planner-weather-stat-label">Rain chance</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val" style="font-size:0.85rem">${escHtml(dayData.desc)}</div>
+          <div class="planner-weather-stat-label">Outlook</div>
+        </div>
+      </div>
+      <div class="wind-compass-wrap" title="Wind from ${escHtml(windFromLabel)}">
+        ${buildWindCompassSVG(dayData.windDir)}
+      </div>
+    `;
+  }
+
+  const targetDist = state.targetDistance || 40;
+  const scored = scoreSundayRoutes(allRoutes, weatherData, targetDist, dayData);
+  renderPickCards(scored.slice(0, 3), picksContainer);
 }
 
 /* ════════════════════════════════════════════════════════════════════
    RIDE PLANNER — Scoring & Rendering
    ════════════════════════════════════════════════════════════════════ */
 const DIR_TO_BEARING = { N:0, NE:45, E:90, SE:135, S:180, SW:225, W:270, NW:315 };
+
+/* Return the selected day's weather object, or default ride day (Sunday) */
+function getSelectedDayWeather() {
+  if (!weatherData || !weatherData.daily) return null;
+  if (state.selectedDayIdx != null && weatherData.daily[state.selectedDayIdx]) {
+    return weatherData.daily[state.selectedDayIdx];
+  }
+  return weatherData.sunday || null;
+}
 
 function windAlignmentScore(routeDir, sundayWeather) {
   if (!sundayWeather) return 0;
@@ -2782,16 +3144,19 @@ function windLabel(score) {
   return                     { text: 'Headwind home',    cls: 'pick-wind-head' };
 }
 
-function scoreSundayRoutes(routes, weather, targetDist) {
-  if (!weather || !weather.sunday) return routes.slice(0, 3);
-  const sunday = weather.sunday;
+function scoreSundayRoutes(routes, weather, targetDist, dayWeather) {
+  const day = dayWeather || (weather && weather.sunday);
+  if (!day) return routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road').slice(0, 3);
 
-  return routes.map(route => {
+  // Only score Road rides for the planner
+  const roadRoutes = routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road');
+
+  return roadRoutes.map(route => {
     const dist = safeNum(route.distance_miles);
     const dir = normaliseDir(route.direction);
 
     // Wind alignment (45% weight)
-    const ws = windAlignmentScore(dir, sunday);
+    const ws = windAlignmentScore(dir, day);
 
     // Distance match — gaussian around target (35% weight)
     const distDiff = Math.abs(dist - targetDist);
@@ -2838,7 +3203,6 @@ function buildWindCompassSVG(windDir) {
 }
 
 function renderRidePlanner(weather, routes) {
-  const heading = document.getElementById('plannerHeading');
   const advice = document.getElementById('plannerAdvice');
   const picksContainer = document.getElementById('plannerPicks');
   const weatherCard = document.getElementById('plannerWeatherCard');
@@ -2847,74 +3211,36 @@ function renderRidePlanner(weather, routes) {
   if (!weather || !weather.sunday) {
     if (advice) advice.textContent = 'Weather data unavailable — showing routes by distance match only.';
     if (weatherCard) weatherCard.innerHTML = '<div class="planner-no-weather">Weather unavailable</div>';
-    // Still show top picks by distance
+    // Still show top picks by distance (road only)
     const targetDist = state.targetDistance || 40;
-    const sorted = routes.slice().sort((a, b) => {
+    const roadRoutes = routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road');
+    const sorted = roadRoutes.slice().sort((a, b) => {
       return Math.abs(safeNum(a.distance_miles) - targetDist) - Math.abs(safeNum(b.distance_miles) - targetDist);
     }).slice(0, 3);
     renderPickCards(sorted, picksContainer);
     return;
   }
 
-  const sunday = weather.sunday;
-
-  // Update heading
-  if (heading) heading.textContent = `This ${sunday.dayName}'s Ride`;
-
-  // Wind direction advice
-  const windFromLabel = sunday.windDirLabel;
-  // The optimal outbound direction is INTO the wind (so you have tailwind home)
-  const optimalOutbound = degreesToCompass(sunday.windDir); // ride INTO wind = wind direction
-  const optimalReturn = degreesToCompass((sunday.windDir + 180) % 360);
-  if (advice) {
-    advice.innerHTML = `Wind from the <strong>${escHtml(windFromLabel)}</strong> at <strong>${sunday.windSpeed} mph</strong> — `
-      + `head <strong>${escHtml(optimalOutbound)}</strong> outbound for a tailwind home.`;
+  // Default to the ride day (Sunday) and set selectedDayIdx
+  const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+  if (state.selectedDayIdx == null) {
+    state.selectedDayIdx = weather.daily.findIndex(d => d.dayName === rideDay);
+    if (state.selectedDayIdx < 0) state.selectedDayIdx = 0;
   }
 
-  // Weather card
-  if (weatherCard) {
-    weatherCard.innerHTML = `
-      <div class="planner-weather-day">${escHtml(sunday.dayName)}</div>
-      <div class="planner-weather-date">${formatDateNice(sunday.date)}</div>
-      <div class="planner-weather-icon">${sunday.icon}</div>
-      <div class="planner-weather-desc">${escHtml(sunday.desc)}</div>
-      <div class="planner-weather-stats">
-        <div>
-          <div class="planner-weather-stat-val">${sunday.tempMax}°<span style="font-size:0.7rem;color:rgba(255,255,255,0.4)">/${sunday.tempMin}°</span></div>
-          <div class="planner-weather-stat-label">Temperature</div>
-        </div>
-        <div>
-          <div class="planner-weather-stat-val">${sunday.windSpeed}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)"> mph</span></div>
-          <div class="planner-weather-stat-label">Wind ${escHtml(windFromLabel)}</div>
-        </div>
-        <div>
-          <div class="planner-weather-stat-val">${sunday.rainProb}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)">%</span></div>
-          <div class="planner-weather-stat-label">Rain chance</div>
-        </div>
-        <div>
-          <div class="planner-weather-stat-val" style="font-size:0.85rem">${escHtml(sunday.desc)}</div>
-          <div class="planner-weather-stat-label">Outlook</div>
-        </div>
-      </div>
-      <div class="wind-compass-wrap" title="Wind from ${escHtml(windFromLabel)}">
-        ${buildWindCompassSVG(sunday.windDir)}
-      </div>
-    `;
-  }
+  // Render the initial day
+  renderRidePlannerForDay(weather.daily[state.selectedDayIdx]);
 
-  // Score all routes, show top 3 picks
-  const targetDist = state.targetDistance || 40;
-  const scored = scoreSundayRoutes(routes, weather, targetDist);
-  renderPickCards(scored.slice(0, 3), picksContainer);
-
-  // Bind slider events
+  // Bind slider events (once)
   if (plannerDistSlider && !plannerDistSlider._bound) {
     plannerDistSlider._bound = true;
     plannerDistSlider.addEventListener('input', function() {
       state.targetDistance = parseInt(this.value, 10);
       const valEl = document.getElementById('plannerDistVal');
       if (valEl) valEl.textContent = state.targetDistance + ' mi';
-      const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance);
+      // Re-score using the currently selected day
+      const dayWeather = getSelectedDayWeather();
+      const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance, dayWeather);
       renderPickCards(scored2.slice(0, 3), document.getElementById('plannerPicks'));
     });
   }
@@ -3066,9 +3392,10 @@ function scoreRouteForPrefs(route, prefs) {
 
   // 2. Wind alignment (25% weight, if weather available)
   let windScore = 0.5; // neutral default
-  if (weatherData && weatherData.sunday) {
+  const selectedDayFmr = getSelectedDayWeather();
+  if (selectedDayFmr) {
     const dir = normaliseDir(route.direction);
-    const ws = windAlignmentScore(dir, weatherData.sunday);
+    const ws = windAlignmentScore(dir, selectedDayFmr);
     windScore = (ws + 1) / 2; // normalise from [-1,1] to [0,1]
   }
   score += 0.25 * windScore;
@@ -3267,16 +3594,18 @@ function showComparison() {
       case 'coffee_time': return escHtml(safe(route.time_with_coffee) || '—');
       case 'cafe': return route.cafe_name ? escHtml(safe(route.cafe_name)) : '—';
       case 'wind': {
-        if (!weatherData || !weatherData.sunday) return '—';
-        const ws = windAlignmentScore(normaliseDir(route.direction), weatherData.sunday);
+        const cmpDay = getSelectedDayWeather();
+        if (!cmpDay) return '—';
+        const ws = windAlignmentScore(normaliseDir(route.direction), cmpDay);
         const wl = windLabel(ws);
         return `<span class="compare-wind-cell ${wl.cls.replace('pick-', 'card-wind-badge ')}">${escHtml(wl.text)}</span>`;
       }
       case 'match': {
         if (route.fmrScore !== undefined) return route.fmrScore + '%';
-        if (!weatherData || !weatherData.sunday) return '—';
+        const cmpDayM = getSelectedDayWeather();
+        if (!cmpDayM) return '—';
         const dir = normaliseDir(route.direction);
-        const ws = windAlignmentScore(dir, weatherData.sunday);
+        const ws = windAlignmentScore(dir, cmpDayM);
         const dist = safeNum(route.distance_miles);
         const targetDist = state.targetDistance || CONFIG.TARGET_DISTANCE || 40;
         const distDiff = Math.abs(dist - targetDist);
@@ -3473,10 +3802,11 @@ function buildCard(route, idx) {
   const gpxDisabled = !route.gpx_url ? 'disabled data-tip="GPX not yet available"' : '';
   const garminDisabled = !route.garmin_link ? 'style="display:none"' : '';
 
-  // Weather-aware row
+  // Weather-aware row — uses selected day (or default ride day)
   let weatherRowHtml = '';
-  if (weatherData && weatherData.sunday) {
-    const sun = weatherData.sunday;
+  const selectedDayW = getSelectedDayWeather();
+  if (selectedDayW) {
+    const sun = selectedDayW;
     const dir = normaliseDir(route.direction);
     const ws = windAlignmentScore(dir, sun);
     const wl = windLabel(ws);
@@ -3502,6 +3832,7 @@ function buildCard(route, idx) {
     </svg>`;
 
     const windDotHtml = ws > 0.7 ? '🟢' : ws > 0.25 ? '🟡' : ws > -0.25 ? '🟠' : '🔴';
+    const dayLabel = sun.dayName ? escHtml(sun.dayName.slice(0, 3)) : '';
 
     weatherRowHtml = `
       <div class="card-weather-row">
@@ -3631,6 +3962,7 @@ function buildCard(route, idx) {
             <div class="stats-bar-key">rec. mph</div>
           </div>
         </div>
+        ${CONFIG.ROAD_CLOSURES_ENABLED ? `<div class="closure-container" id="closures-${slug}"></div>` : ''}
         <div class="map-container" id="map-${slug}"></div>
         <div class="elevation-wrap">
           <div class="elevation-label">Elevation Profile</div>
@@ -3663,6 +3995,18 @@ function toggleMap(slug, idx) {
     openMaps[slug] = true;
     const route = filteredRoutes[idx];
     setTimeout(() => initMap(slug, route), 80);
+
+    // Check road closures (lazy, on first expand only)
+    if (CONFIG.ROAD_CLOSURES_ENABLED && route.gpx_url) {
+      const closureEl = document.getElementById(`closures-${slug}`);
+      if (closureEl && !closureEl._checked) {
+        closureEl._checked = true;
+        closureEl.innerHTML = '<div class="closure-loading">🔍 Checking road closures...</div>';
+        checkRouteClosure(route.gpx_url, slug).then(result => {
+          closureEl.innerHTML = renderClosureHtml(result);
+        });
+      }
+    }
   }
 }
 
