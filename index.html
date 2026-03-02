@@ -4609,17 +4609,20 @@ async function refreshMasterMap() {
 
         // Add to the BOTTOM layer so circle markers always sit on top and receive clicks first
         masterGpxLayer.addLayer(e.target);
-        // Expand bounds to include the full track
-        const gpxBounds = e.target.getBounds();
-        if (gpxBounds.isValid()) masterMapInstance.fitBounds(gpxBounds.extend(bounds), { padding: [40,40], maxZoom: 12 });
       }).on('error', function() {
         // GPX load failed silently — marker still shows
       });
     }
   });
 
-  // Fit map to show all markers with padding
-  masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+  // Fit map: if showing all routes, centre on HQ at comfortable zoom;
+  // if filtered (type/distance/etc.), zoom to fit the filtered set
+  const isDefaultView = state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
+  if (isDefaultView) {
+    masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+  } else {
+    masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+  }
 
   // Invalidate size in case the panel just became visible
   masterMapInstance.invalidateSize(true); // force tile reload after fitBounds
