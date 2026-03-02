@@ -852,6 +852,7 @@
 
     .map-container { height: 340px; }
     .map-container .leaflet-container { height: 100%; width: 100%; }
+    .leaflet-interactive:focus { outline: none; }
     .cafe-marker { background: none; border: none; }
 
     .elevation-wrap {
@@ -912,6 +913,7 @@
     /* ─── WEATHER STRIP ───────────────────────────────────────────── */
     .weather-strip {
       display: flex;
+      justify-content: center;
       gap: 0.5rem;
       overflow-x: auto;
       padding: 1rem 1.5rem;
@@ -925,8 +927,9 @@
     .weather-strip::-webkit-scrollbar-thumb { background: rgba(44,188,179,0.3); border-radius: 2px; }
 
     .weather-day {
-      flex: 0 0 auto;
+      flex: 1 1 0;
       min-width: 100px;
+      max-width: 140px;
       padding: 0.65rem 0.75rem;
       border-radius: var(--radius-sm);
       background: rgba(255,255,255,0.04);
