@@ -3984,7 +3984,7 @@ function buildCard(route, idx) {
             <div class="stats-bar-key">rec. mph</div>
           </div>
         </div>
-        ${CONFIG.ROAD_CLOSURES_ENABLED ? `<div class="closure-container" id="closures-${slug}"></div>` : ''}
+        <!-- Road closures shown on card map only, not as text -->
         <div class="map-container" id="map-${slug}"></div>
         <div class="elevation-wrap">
           <div class="elevation-label">Elevation Profile</div>
@@ -4018,17 +4018,7 @@ function toggleMap(slug, idx) {
     const route = filteredRoutes[idx];
     setTimeout(() => initMap(slug, route), 80);
 
-    // Check road closures (lazy, on first expand only)
-    if (CONFIG.ROAD_CLOSURES_ENABLED && route.gpx_url) {
-      const closureEl = document.getElementById(`closures-${slug}`);
-      if (closureEl && !closureEl._checked) {
-        closureEl._checked = true;
-        closureEl.innerHTML = '<div class="closure-loading">🔍 Checking road closures...</div>';
-        checkRouteClosure(route.gpx_url, slug).then(result => {
-          closureEl.innerHTML = renderClosureHtml(result);
-        });
-      }
-    }
+    // Road closures are shown on card map via addClosuresToCardMap() — no per-route API calls
   }
 }
 
@@ -4254,6 +4244,9 @@ function resetFilters() {
   state.excludeBusway = false;
   state.showRoadworks = false;
 
+  // Reset map position flag so view centres on HQ again
+  if (masterMapInstance) masterMapInstance._userMoved = false;
+
   // Reset UI
   document.getElementById('distMin').value = 0;
   document.getElementById('distMax').value = 160;
@@ -4471,6 +4464,12 @@ async function refreshMasterMap() {
         iconSize: [14, 14], iconAnchor: [7, 7]
       })
     }).addTo(masterMapInstance).bindTooltip('🏠 Swavesey HQ', { permanent: false });
+    // Track user-initiated map moves (pan/zoom) to avoid resetting view on filter change
+    masterMapInstance._userMoved = false;
+    masterMapInstance.on('dragend zoomend', function(e) {
+      // Only set flag for user interactions, not programmatic moves
+      if (!masterMapInstance._programmaticMove) masterMapInstance._userMoved = true;
+    });
     masterMapInstance.invalidateSize();
   }
 
@@ -4615,21 +4614,31 @@ async function refreshMasterMap() {
     }
   });
 
-  // Fit map: if showing all routes, centre on HQ at comfortable zoom;
-  // if filtered (type/distance/etc.), zoom to fit the filtered set
-  const isDefaultView = state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
-  if (isDefaultView) {
-    masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
-  } else {
-    masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+  // Preserve user's manual zoom/pan — only reset view on initial load or "Reset all filters"
+  if (!masterMapInstance._userMoved) {
+    const isDefaultView = state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
+    masterMapInstance._programmaticMove = true;
+    if (isDefaultView) {
+      masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    } else {
+      masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+    }
+    setTimeout(() => { masterMapInstance._programmaticMove = false; }, 500);
   }
 
   // Invalidate size in case the panel just became visible
   masterMapInstance.invalidateSize(true); // force tile reload after fitBounds
 
-  // Overlay road closures (async, non-blocking)
+  // Overlay road closures — ensure layers are on the master map
   if (CONFIG.ROAD_CLOSURES_ENABLED && CONFIG.TOMTOM_API_KEY) {
-    loadMapClosures();
+    loadMapClosures().then(() => {
+      if (masterClosureLayer && !masterMapInstance.hasLayer(masterClosureLayer)) {
+        masterMapInstance.addLayer(masterClosureLayer);
+      }
+      if (masterRoadworkLayer && state.showRoadworks && !masterMapInstance.hasLayer(masterRoadworkLayer)) {
+        masterMapInstance.addLayer(masterRoadworkLayer);
+      }
+    }).catch(() => {});
   }
 }
 
@@ -4662,13 +4671,13 @@ function buildClosurePopup(inc) {
 }
 
 async function loadMapClosures() {
-  if (_closuresLoaded && masterClosureLayer) return; // already loaded
+  if (_closuresLoaded) return; // already loaded
 
-  // Create or clear the closure layer (always visible) and roadwork layer (off by default)
+  // Create layers (don't add to map yet — master map may not exist)
   if (masterClosureLayer) { masterClosureLayer.clearLayers(); }
-  else { masterClosureLayer = L.layerGroup().addTo(masterMapInstance); }
+  else { masterClosureLayer = L.layerGroup(); }
   if (masterRoadworkLayer) { masterRoadworkLayer.clearLayers(); }
-  else { masterRoadworkLayer = L.layerGroup(); /* NOT added to map — off by default */ }
+  else { masterRoadworkLayer = L.layerGroup(); }
 
   try {
     // Wide bbox covering Cambridgeshire cycling area (Bedford to Ely to Newmarket)
@@ -4808,19 +4817,31 @@ function addClosuresToCardMap(map) {
     if (!nearRoute) return;
 
     const colour = inc._isClosure ? '#dc2626' : '#f59e0b';
+    const emoji = inc._isClosure ? '🚫' : '🚧';
+
+    // Glow/outline layer underneath for visibility
+    const glow = L.polyline(inc._latLngs, {
+      color: inc._isClosure ? '#000' : '#000',
+      weight: 12,
+      opacity: 0.3,
+      lineCap: 'round',
+    });
+    glow.addTo(map);
+
+    // Main coloured line on top — thick and bold
     const line = L.polyline(inc._latLngs, {
       color: colour,
-      weight: 5,
-      opacity: 0.85,
-      dashArray: inc._isClosure ? null : '8 6',
+      weight: 7,
+      opacity: 0.95,
+      dashArray: inc._isClosure ? null : '10 6',
+      lineCap: 'round',
     });
 
     line.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
-    const emoji = inc._isClosure ? '🚫' : '🚧';
     line.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
 
-    line.on('mouseover', function() { this.setStyle({ weight: 8, opacity: 1 }); });
-    line.on('mouseout', function() { this.setStyle({ weight: 5, opacity: 0.85 }); });
+    line.on('mouseover', function() { this.setStyle({ weight: 10, opacity: 1 }); });
+    line.on('mouseout', function() { this.setStyle({ weight: 7, opacity: 0.95 }); });
 
     line.addTo(map);
     added++;
@@ -4872,6 +4893,11 @@ async function init() {
 
     dbg(`init complete — ${allRoutes.length} routes, ${allCafes.length} cafes loaded`, allRoutes.length > 0);
     applyFilters();
+
+    // Pre-fetch road closure data in background (needed for card maps even before Map view opens)
+    if (CONFIG.ROAD_CLOSURES_ENABLED && CONFIG.TOMTOM_API_KEY) {
+      loadMapClosures().catch(() => {});
+    }
   } catch (err) {
     dbg(`init failed: ${err.message}`, false);
     console.error('Failed to load routes:', err);
