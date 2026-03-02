@@ -2054,9 +2054,9 @@
             </label>
           </div>
           <div class="switch-row">
-            <span class="switch-label">🚧 Show road closures</span>
+            <span class="switch-label">🚧 Show roadworks</span>
             <label class="switch">
-              <input type="checkbox" id="closuresToggle" checked>
+              <input type="checkbox" id="roadworksToggle">
               <span class="switch-track"></span>
             </label>
           </div>
@@ -2675,7 +2675,7 @@ const state = {
   directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
   mapDisplay: 'all',  // 'routes' | 'all' | 'cafes'
   excludeBusway: false,
-  showClosures: true,
+  showRoadworks: false,
   sort: 'name',
   targetDistance: CONFIG.TARGET_DISTANCE,  // for ride planner
   selectedDayIdx: null,  // index into weatherData.daily (null = default ride day)
@@ -4256,7 +4256,7 @@ function resetFilters() {
   state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']);
   state.mapDisplay = 'all';
   state.excludeBusway = false;
-  state.showClosures = true;
+  state.showRoadworks = false;
 
   // Reset UI
   document.getElementById('distMin').value = 0;
@@ -4268,8 +4268,8 @@ function resetFilters() {
   document.getElementById('ascentMinVal').textContent = '0 m';
   document.getElementById('ascentMaxVal').textContent = '2500 m';
   document.getElementById('buswayToggle').checked = false;
-  document.getElementById('closuresToggle').checked = true;
-  if (masterClosureLayer && masterMapInstance) masterMapInstance.addLayer(masterClosureLayer);
+  document.getElementById('roadworksToggle').checked = false;
+  if (masterRoadworkLayer && masterMapInstance) masterMapInstance.removeLayer(masterRoadworkLayer);
   document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
   document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
@@ -4328,14 +4328,14 @@ function initControls() {
     state.excludeBusway = e.target.checked; applyFilters();
   });
 
-  // Road closures toggle
-  document.getElementById('closuresToggle').addEventListener('change', e => {
-    state.showClosures = e.target.checked;
-    if (masterClosureLayer && masterMapInstance) {
-      if (state.showClosures) {
-        masterMapInstance.addLayer(masterClosureLayer);
+  // Roadworks toggle (closures are always shown; roadworks off by default)
+  document.getElementById('roadworksToggle').addEventListener('change', e => {
+    state.showRoadworks = e.target.checked;
+    if (masterRoadworkLayer && masterMapInstance) {
+      if (state.showRoadworks) {
+        masterMapInstance.addLayer(masterRoadworkLayer);
       } else {
-        masterMapInstance.removeLayer(masterClosureLayer);
+        masterMapInstance.removeLayer(masterRoadworkLayer);
       }
     }
   });
@@ -4409,7 +4409,8 @@ let masterMapInstance = null;
 let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
 let masterCafeLayer   = null;  // café markers — middle layer
 let masterGpxLayer    = null;  // GPX track lines — bottom layer, interactive with popup + hover
-let masterClosureLayer = null; // road closure markers
+let masterClosureLayer = null;  // road closure icons (always visible)
+let masterRoadworkLayer = null; // roadwork icons (toggle, off by default)
 let currentView = 'list';
 
 function switchView(view) {
@@ -4661,9 +4662,11 @@ function buildClosurePopup(inc) {
 async function loadMapClosures() {
   if (_closuresLoaded && masterClosureLayer) return; // already loaded
 
-  // Create or clear the closure layer
+  // Create or clear the closure layer (always visible) and roadwork layer (off by default)
   if (masterClosureLayer) { masterClosureLayer.clearLayers(); }
   else { masterClosureLayer = L.layerGroup().addTo(masterMapInstance); }
+  if (masterRoadworkLayer) { masterRoadworkLayer.clearLayers(); }
+  else { masterRoadworkLayer = L.layerGroup(); /* NOT added to map — off by default */ }
 
   try {
     // Wide bbox covering Cambridgeshire cycling area (Bedford to Ely to Newmarket)
@@ -4713,7 +4716,8 @@ async function loadMapClosures() {
       };
     }).filter(Boolean);
 
-    // Add icon markers to master map at each incident midpoint
+    // Add icon markers: closures → always-visible layer, roadworks → toggleable layer
+    let closureCount = 0, roadworkCount = 0;
     _closureIncidents.forEach(inc => {
       const emoji = inc._isClosure ? '🚫' : '🚧';
       const markerCls = inc._isClosure ? 'closure-marker-closure' : 'closure-marker-roadwork';
@@ -4729,10 +4733,17 @@ async function loadMapClosures() {
       const marker = L.marker([inc._midLat, inc._midLon], { icon, interactive: true });
       marker.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
       marker.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
-      marker.addTo(masterClosureLayer);
+
+      if (inc._isClosure) {
+        marker.addTo(masterClosureLayer);
+        closureCount++;
+      } else {
+        marker.addTo(masterRoadworkLayer);
+        roadworkCount++;
+      }
     });
 
-    dbg(`TomTom: ${_closureIncidents.length} road incidents (icons) on map`, true);
+    dbg(`TomTom: ${closureCount} closures (always shown) + ${roadworkCount} roadworks (toggle) on map`, true);
     _closuresLoaded = true;
 
     // Process any card maps that opened before closure data was ready
