@@ -666,6 +666,21 @@
       font-style: italic;
     }
 
+    /* Map closure icon markers */
+    .closure-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      font-size: 11px;
+      line-height: 1;
+      text-align: center;
+    }
+    .closure-marker-closure { background: #dc2626; }
+    .closure-marker-roadwork { background: #f59e0b; }
+
     .card-meta {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -2038,6 +2053,13 @@
               <span class="switch-track"></span>
             </label>
           </div>
+          <div class="switch-row">
+            <span class="switch-label">🚧 Show road closures</span>
+            <label class="switch">
+              <input type="checkbox" id="closuresToggle" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
         </div>
 
         <!-- Sort -->
@@ -2653,6 +2675,7 @@ const state = {
   directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
   mapDisplay: 'all',  // 'routes' | 'all' | 'cafes'
   excludeBusway: false,
+  showClosures: true,
   sort: 'name',
   targetDistance: CONFIG.TARGET_DISTANCE,  // for ride planner
   selectedDayIdx: null,  // index into weatherData.daily (null = default ride day)
@@ -4100,7 +4123,10 @@ function initMap(slug, route) {
       map.fitBounds(e.target.getBounds());
       buildElevationChart(slug, e.target);
       // Add café markers once the map settles to the new bounds
-      map.once('moveend', function() { addCafesToMap(map, 22); });
+      map.once('moveend', function() {
+            addCafesToMap(map, 22);
+            addClosuresToCardMap(map);
+          });
       e.target.eachLayer(function(layer) {
         if (layer.setStyle) {
           layer.on('mouseover', function() { this.setStyle({ weight: 5, opacity: 1.0 }); });
@@ -4231,6 +4257,7 @@ function resetFilters() {
   state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']);
   state.mapDisplay = 'all';
   state.excludeBusway = false;
+  state.showClosures = true;
 
   // Reset UI
   document.getElementById('distMin').value = 0;
@@ -4242,6 +4269,8 @@ function resetFilters() {
   document.getElementById('ascentMinVal').textContent = '0 m';
   document.getElementById('ascentMaxVal').textContent = '2500 m';
   document.getElementById('buswayToggle').checked = false;
+  document.getElementById('closuresToggle').checked = true;
+  if (masterClosureLayer && masterMapInstance) masterMapInstance.addLayer(masterClosureLayer);
   document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
   document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
@@ -4298,6 +4327,18 @@ function initControls() {
   // Busway toggle
   document.getElementById('buswayToggle').addEventListener('change', e => {
     state.excludeBusway = e.target.checked; applyFilters();
+  });
+
+  // Road closures toggle
+  document.getElementById('closuresToggle').addEventListener('change', e => {
+    state.showClosures = e.target.checked;
+    if (masterClosureLayer && masterMapInstance) {
+      if (state.showClosures) {
+        masterMapInstance.addLayer(masterClosureLayer);
+      } else {
+        masterMapInstance.removeLayer(masterClosureLayer);
+      }
+    }
   });
 
   // Sort
@@ -4590,8 +4631,34 @@ async function refreshMasterMap() {
   }
 }
 
-/** Fetch all road closures/roadworks for the route area and overlay on master map */
+/** Fetch all road closures/roadworks for the route area and overlay on maps */
 let _closuresLoaded = false;
+let _closureIncidents = []; // stored for reuse by card maps
+let _pendingClosureMaps = []; // card maps awaiting closure data
+
+function formatClosureDates(props) {
+  if (!props.startTime && !props.endTime) return '';
+  const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}); } catch(e) { return ''; } };
+  const s = props.startTime ? fmt(props.startTime) : '';
+  const e = props.endTime ? fmt(props.endTime) : '';
+  return s && e ? `${s} – ${e}` : s ? `From ${s}` : e ? `Until ${e}` : '';
+}
+
+function buildClosurePopup(inc) {
+  const props = inc.properties || {};
+  const isClosure = inc._isClosure;
+  const desc = inc._desc;
+  const from = escHtml(props.from || '');
+  const to = escHtml(props.to || '');
+  const dateStr = formatClosureDates(props);
+  const icon = isClosure ? '🚫' : '🚧';
+  return `<div style="min-width:160px;font-size:0.82rem">
+    <div style="font-weight:700;font-size:0.9rem">${icon} ${escHtml(desc)}</div>
+    ${from ? `<div style="margin-top:0.3rem;color:#555">${from}${to ? ' → ' + to : ''}</div>` : ''}
+    ${dateStr ? `<div style="margin-top:0.2rem;font-size:0.75rem;color:#888">${dateStr}</div>` : ''}
+  </div>`;
+}
+
 async function loadMapClosures() {
   if (_closuresLoaded && masterClosureLayer) return; // already loaded
 
@@ -4600,8 +4667,7 @@ async function loadMapClosures() {
   else { masterClosureLayer = L.layerGroup().addTo(masterMapInstance); }
 
   try {
-    // Use a wide bbox around the Cambridgeshire cycling area
-    // Covers roughly from Bedford to Ely to Newmarket
+    // Wide bbox covering Cambridgeshire cycling area (Bedford to Ely to Newmarket)
     const bbox = '-0.55,52.0,0.45,52.55';
     const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
       + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
@@ -4621,60 +4687,134 @@ async function loadMapClosures() {
       return;
     }
 
-    data.incidents.forEach(inc => {
+    // Pre-process and store for card map reuse
+    _closureIncidents = data.incidents.map(inc => {
       const props = inc.properties || {};
       const geom = inc.geometry || {};
       const coords = geom.coordinates || [];
-      if (coords.length === 0) return;
-
       const cat = props.iconCategory;
+      // Only keep roadworks (6,9) and closures (7,8) — no traffic/congestion
+      if (![6, 7, 8, 9].includes(cat)) return null;
+      if (coords.length === 0) return null;
+
       const isClosure = cat === 7 || cat === 8;
       const desc = (props.events && props.events[0] && props.events[0].description) || 'Road incident';
-      const from = escHtml(props.from || '');
-      const to = escHtml(props.to || '');
+      // Calculate midpoint for icon placement
+      const midIdx = Math.floor(coords.length / 2);
+      const midLon = coords[midIdx][0];
+      const midLat = coords[midIdx][1];
 
-      // Draw the incident as a polyline on the map
-      const latLngs = coords.map(c => [c[1], c[0]]); // GeoJSON [lon,lat] → Leaflet [lat,lon]
+      return {
+        ...inc,
+        _isClosure: isClosure,
+        _desc: desc,
+        _midLat: midLat,
+        _midLon: midLon,
+        _latLngs: coords.map(c => [c[1], c[0]]) // GeoJSON [lon,lat] → Leaflet [lat,lon]
+      };
+    }).filter(Boolean);
 
-      const colour = isClosure ? '#dc2626' : '#f59e0b';
-      const line = L.polyline(latLngs, {
-        color: colour,
-        weight: 6,
-        opacity: 0.8,
-        dashArray: isClosure ? null : '8 6',
+    // Add icon markers to master map at each incident midpoint
+    _closureIncidents.forEach(inc => {
+      const emoji = inc._isClosure ? '🚫' : '🚧';
+      const markerCls = inc._isClosure ? 'closure-marker-closure' : 'closure-marker-roadwork';
+      const size = 22;
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="closure-marker ${markerCls}" style="width:${size}px;height:${size}px">${emoji}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
       });
 
-      // Format dates
-      let dateStr = '';
-      if (props.startTime || props.endTime) {
-        const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}); } catch(e) { return ''; } };
-        const s = props.startTime ? fmt(props.startTime) : '';
-        const e = props.endTime ? fmt(props.endTime) : '';
-        dateStr = s && e ? `${s} – ${e}` : s ? `From ${s}` : e ? `Until ${e}` : '';
-      }
-
-      const icon = isClosure ? '🚫' : '🚧';
-      const popupHtml = `<div style="min-width:160px;font-size:0.82rem">
-        <div style="font-weight:700;font-size:0.9rem">${icon} ${escHtml(desc)}</div>
-        ${from ? `<div style="margin-top:0.3rem;color:#555">${from}${to ? ' → ' + to : ''}</div>` : ''}
-        ${dateStr ? `<div style="margin-top:0.2rem;font-size:0.75rem;color:#888">${dateStr}</div>` : ''}
-      </div>`;
-
-      line.bindPopup(popupHtml, { maxWidth: 260 });
-      line.bindTooltip(`${icon} ${escHtml(desc)}`, { sticky: true });
-
-      // Hover effect
-      line.on('mouseover', function() { this.setStyle({ weight: 9, opacity: 1 }); });
-      line.on('mouseout', function() { this.setStyle({ weight: 6, opacity: 0.8 }); });
-
-      line.addTo(masterClosureLayer);
+      const marker = L.marker([inc._midLat, inc._midLon], { icon, interactive: true });
+      marker.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
+      marker.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
+      marker.addTo(masterClosureLayer);
     });
 
-    dbg(`TomTom: ${data.incidents.length} road incidents overlaid on map`, true);
+    dbg(`TomTom: ${_closureIncidents.length} road incidents (icons) on map`, true);
     _closuresLoaded = true;
+
+    // Process any card maps that opened before closure data was ready
+    if (_pendingClosureMaps.length > 0) {
+      _pendingClosureMaps.forEach(m => { try { addClosuresToCardMap(m); } catch(e) {} });
+      _pendingClosureMaps = [];
+    }
   } catch (e) {
     dbg(`Map closures failed: ${e.message}`, false);
+    _closuresLoaded = true; // mark loaded even on error to avoid retries
   }
+}
+
+/** Add closure/roadworks lines to an individual route card map.
+ *  Only shows closures whose midpoint is within ~500m of the GPX route line. */
+function addClosuresToCardMap(map) {
+  if (!_closureIncidents || _closureIncidents.length === 0) {
+    // Data not ready yet — queue this map for later when closures load
+    if (!_closuresLoaded) _pendingClosureMaps.push(map);
+    return;
+  }
+
+  // Collect GPX route points from the map
+  const routePoints = [];
+  map.eachLayer(l => {
+    if (l instanceof L.GPX || (l instanceof L.FeatureGroup && l.getLayers)) {
+      (l.getLayers ? l.getLayers() : [l]).forEach(sub => {
+        if (sub.getLatLngs) {
+          const lls = sub.getLatLngs();
+          if (lls.length > 0 && lls[0] instanceof L.LatLng) {
+            lls.forEach(ll => routePoints.push(ll));
+          } else if (Array.isArray(lls[0])) {
+            lls.forEach(arr => arr.forEach(ll => routePoints.push(ll)));
+          }
+        }
+      });
+    }
+  });
+  if (routePoints.length === 0) return; // no route to compare against
+
+  // Sample route points every ~10th point for performance (routes can have 1000s of points)
+  const step = Math.max(1, Math.floor(routePoints.length / 200));
+  const sampled = routePoints.filter((_, i) => i % step === 0);
+
+  // Haversine distance in metres (fast approx)
+  function distM(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  const PROXIMITY_M = 500; // 500m from route
+  let added = 0;
+
+  _closureIncidents.forEach(inc => {
+    // Check if closure midpoint is within PROXIMITY_M of any sampled route point
+    const nearRoute = sampled.some(rp => distM(inc._midLat, inc._midLon, rp.lat, rp.lng) < PROXIMITY_M);
+    if (!nearRoute) return;
+
+    const colour = inc._isClosure ? '#dc2626' : '#f59e0b';
+    const line = L.polyline(inc._latLngs, {
+      color: colour,
+      weight: 5,
+      opacity: 0.85,
+      dashArray: inc._isClosure ? null : '8 6',
+    });
+
+    line.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
+    const emoji = inc._isClosure ? '🚫' : '🚧';
+    line.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
+
+    line.on('mouseover', function() { this.setStyle({ weight: 8, opacity: 1 }); });
+    line.on('mouseout', function() { this.setStyle({ weight: 5, opacity: 0.85 }); });
+
+    line.addTo(map);
+    added++;
+  });
+
+  if (added > 0) dbg(`Card map: ${added} closures near route`, true);
 }
 
 function scrollToCard(slug) {
