@@ -2138,8 +2138,8 @@ const CONFIG = {
   WEATHER_ENABLED: true,         // true = fetch 7-day forecast from Open-Meteo
   DEFAULT_RIDE_DAY: 'sunday',    // day the club typically rides
   TARGET_DISTANCE: 40,           // default target distance in miles for ride planner
-  TOMTOM_API_KEY: '',            // TomTom Traffic API key (free at developer.tomtom.com). Empty = road closures disabled.
-  ROAD_CLOSURES_ENABLED: false,  // set true + add TOMTOM_API_KEY to enable road closure checking
+  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',  // TomTom Traffic API key (free at developer.tomtom.com)
+  ROAD_CLOSURES_ENABLED: true,   // road closure checking on GPX routes
 
   // Maps your actual sheet column headers → internal app field names (all lowercase keys)
   COLUMN_MAP: {
@@ -2511,13 +2511,14 @@ async function checkRouteClosure(gpxUrl, slug) {
     minLon -= BUFFER; maxLon += BUFFER;
 
     // Query TomTom Traffic Incidents API
-    const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+    // TomTom bbox format: minLon,minLat,maxLon,maxLat
+    const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
     const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
       + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
       + `&bbox=${bbox}`
-      + `&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,description,from,to,startTime,endTime,delay,roadNumbers}}}`
+      + `&fields=${encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,startTime,endTime,delay,roadNumbers,events{description}}}}')}`
       + `&language=en-GB`
-      + `&categoryFilter=6,7,8,9,14`  // 6=RoadWork, 7=RoadClosure, 8=LaneClosure, 9=RoadClosedConstruction, 14=BrokenDownVehicle(skip)
+      + `&categoryFilter=6,7,8,9`  // 6=RoadWork, 7=RoadClosure, 8=LaneClosure, 9=RoadClosedConstruction
       + `&timeValidityFilter=present`;
 
     const apiResp = await fetch(apiUrl);
@@ -2557,9 +2558,11 @@ async function checkRouteClosure(gpxUrl, slug) {
           const cat = props.iconCategory;
           const isRoadwork = cat === 6 || cat === 9;
           const isClosure = cat === 7 || cat === 8;
+          // Description is inside events array
+          const desc = (props.events && props.events[0] && props.events[0].description) || 'Road incident';
           incidents.push({
             type: isClosure ? 'closure' : isRoadwork ? 'roadwork' : 'incident',
-            description: escHtml(props.description || 'Road incident'),
+            description: escHtml(desc),
             from: escHtml(props.from || ''),
             to: escHtml(props.to || ''),
             startTime: props.startTime || null,
@@ -4366,6 +4369,7 @@ let masterMapInstance = null;
 let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
 let masterCafeLayer   = null;  // café markers — middle layer
 let masterGpxLayer    = null;  // GPX track lines — bottom layer, interactive with popup + hover
+let masterClosureLayer = null; // road closure markers
 let currentView = 'list';
 
 function switchView(view) {
@@ -4579,6 +4583,98 @@ async function refreshMasterMap() {
 
   // Invalidate size in case the panel just became visible
   masterMapInstance.invalidateSize(true); // force tile reload after fitBounds
+
+  // Overlay road closures (async, non-blocking)
+  if (CONFIG.ROAD_CLOSURES_ENABLED && CONFIG.TOMTOM_API_KEY) {
+    loadMapClosures();
+  }
+}
+
+/** Fetch all road closures/roadworks for the route area and overlay on master map */
+let _closuresLoaded = false;
+async function loadMapClosures() {
+  if (_closuresLoaded && masterClosureLayer) return; // already loaded
+
+  // Create or clear the closure layer
+  if (masterClosureLayer) { masterClosureLayer.clearLayers(); }
+  else { masterClosureLayer = L.layerGroup().addTo(masterMapInstance); }
+
+  try {
+    // Use a wide bbox around the Cambridgeshire cycling area
+    // Covers roughly from Bedford to Ely to Newmarket
+    const bbox = '-0.55,52.0,0.45,52.55';
+    const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
+      + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
+      + `&bbox=${bbox}`
+      + `&fields=${encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,startTime,endTime,events{description}}}}')}`
+      + `&language=en-GB`
+      + `&categoryFilter=6,7,8,9`
+      + `&timeValidityFilter=present`;
+
+    const resp = await fetch(apiUrl);
+    if (!resp.ok) { dbg(`TomTom map closures: HTTP ${resp.status}`, false); return; }
+    const data = await resp.json();
+
+    if (!data.incidents || data.incidents.length === 0) {
+      dbg('TomTom: no incidents in area', true);
+      _closuresLoaded = true;
+      return;
+    }
+
+    data.incidents.forEach(inc => {
+      const props = inc.properties || {};
+      const geom = inc.geometry || {};
+      const coords = geom.coordinates || [];
+      if (coords.length === 0) return;
+
+      const cat = props.iconCategory;
+      const isClosure = cat === 7 || cat === 8;
+      const desc = (props.events && props.events[0] && props.events[0].description) || 'Road incident';
+      const from = escHtml(props.from || '');
+      const to = escHtml(props.to || '');
+
+      // Draw the incident as a polyline on the map
+      const latLngs = coords.map(c => [c[1], c[0]]); // GeoJSON [lon,lat] → Leaflet [lat,lon]
+
+      const colour = isClosure ? '#dc2626' : '#f59e0b';
+      const line = L.polyline(latLngs, {
+        color: colour,
+        weight: 6,
+        opacity: 0.8,
+        dashArray: isClosure ? null : '8 6',
+      });
+
+      // Format dates
+      let dateStr = '';
+      if (props.startTime || props.endTime) {
+        const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}); } catch(e) { return ''; } };
+        const s = props.startTime ? fmt(props.startTime) : '';
+        const e = props.endTime ? fmt(props.endTime) : '';
+        dateStr = s && e ? `${s} – ${e}` : s ? `From ${s}` : e ? `Until ${e}` : '';
+      }
+
+      const icon = isClosure ? '🚫' : '🚧';
+      const popupHtml = `<div style="min-width:160px;font-size:0.82rem">
+        <div style="font-weight:700;font-size:0.9rem">${icon} ${escHtml(desc)}</div>
+        ${from ? `<div style="margin-top:0.3rem;color:#555">${from}${to ? ' → ' + to : ''}</div>` : ''}
+        ${dateStr ? `<div style="margin-top:0.2rem;font-size:0.75rem;color:#888">${dateStr}</div>` : ''}
+      </div>`;
+
+      line.bindPopup(popupHtml, { maxWidth: 260 });
+      line.bindTooltip(`${icon} ${escHtml(desc)}`, { sticky: true });
+
+      // Hover effect
+      line.on('mouseover', function() { this.setStyle({ weight: 9, opacity: 1 }); });
+      line.on('mouseout', function() { this.setStyle({ weight: 6, opacity: 0.8 }); });
+
+      line.addTo(masterClosureLayer);
+    });
+
+    dbg(`TomTom: ${data.incidents.length} road incidents overlaid on map`, true);
+    _closuresLoaded = true;
+  } catch (e) {
+    dbg(`Map closures failed: ${e.message}`, false);
+  }
 }
 
 function scrollToCard(slug) {
