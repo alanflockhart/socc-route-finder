@@ -2023,13 +2023,9 @@
           <span class="filter-label">Direction</span>
           <div class="checkbox-grid" id="dirChecks">
             <label class="check-item"><input type="checkbox" value="N" checked> N</label>
-            <label class="check-item"><input type="checkbox" value="NE" checked> NE</label>
             <label class="check-item"><input type="checkbox" value="E" checked> E</label>
-            <label class="check-item"><input type="checkbox" value="SE" checked> SE</label>
             <label class="check-item"><input type="checkbox" value="S" checked> S</label>
-            <label class="check-item"><input type="checkbox" value="SW" checked> SW</label>
             <label class="check-item"><input type="checkbox" value="W" checked> W</label>
-            <label class="check-item"><input type="checkbox" value="NW" checked> NW</label>
           </div>
         </div>
 
@@ -4253,7 +4249,7 @@ function resetFilters() {
   state.type = 'all';
   state.distMin = 0; state.distMax = 160;
   state.ascentMin = 0; state.ascentMax = 2500;
-  state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']);
+  state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']); // all 8 when all 4 cardinals checked
   state.mapDisplay = 'all';
   state.excludeBusway = false;
   state.showRoadworks = false;
@@ -4303,12 +4299,15 @@ function initControls() {
     });
   });
 
-  // Direction checkboxes
+  // Direction checkboxes — each cardinal covers itself + adjacent intercardinals
+  // N → NW, N, NE | E → NE, E, SE | S → SE, S, SW | W → SW, W, NW
+  const DIR_EXPAND = { N: ['NW','N','NE'], E: ['NE','E','SE'], S: ['SE','S','SW'], W: ['SW','W','NW'] };
   document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', () => {
-      state.directions = new Set(
-        [...document.querySelectorAll('#dirChecks input:checked')].map(c => c.value)
-      );
+      const checked = [...document.querySelectorAll('#dirChecks input:checked')].map(c => c.value);
+      const expanded = new Set();
+      checked.forEach(cardinal => (DIR_EXPAND[cardinal] || [cardinal]).forEach(d => expanded.add(d)));
+      state.directions = expanded;
       debouncedFilter();
     });
   });
