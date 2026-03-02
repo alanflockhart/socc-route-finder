@@ -2160,8 +2160,8 @@ const CONFIG = {
   WEATHER_ENABLED: true,         // true = fetch 7-day forecast from Open-Meteo
   DEFAULT_RIDE_DAY: 'sunday',    // day the club typically rides
   TARGET_DISTANCE: 40,           // default target distance in miles for ride planner
-  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',  // TomTom Traffic API key (free at developer.tomtom.com)
-  ROAD_CLOSURES_ENABLED: true,   // road closure checking on GPX routes
+  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',  // TomTom Traffic API key (free tier, 2500 req/day)
+  ROAD_CLOSURES_ENABLED: true,   // Set false to disable ALL TomTom traffic features (map icons, card overlays, per-route checks)
 
   // Maps your actual sheet column headers → internal app field names (all lowercase keys)
   COLUMN_MAP: {
@@ -4144,14 +4144,13 @@ function initMap(slug, route) {
 function buildElevationChart(slug, gpxLayer) {
   const canvas = document.getElementById(`elev-${slug}`);
   if (!canvas) return;
-  // GPX layer elevation data
-  const data = [];
-  gpxLayer.eachLayer(layer => {
-    if (layer.getLatLngs) {
-      const lls = layer.getLatLngs();
-      lls.forEach((ll, i) => { if (ll.alt) data.push(ll.alt); });
-    }
-  });
+  // Use leaflet-gpx's built-in elevation parser: returns [[dist_km, elev_m, label], ...]
+  let elevArr = [];
+  try { elevArr = gpxLayer.get_elevation_data() || []; } catch(e) {}
+  if (elevArr.length === 0) { buildDemoElevationChart(slug); return; }
+  // Extract just the elevation values (index 1), downsample for chart performance
+  const step = Math.max(1, Math.floor(elevArr.length / 200));
+  const data = elevArr.filter((_, i) => i % step === 0).map(pt => pt[1]);
   if (data.length === 0) { buildDemoElevationChart(slug); return; }
   createElevChart(slug, data);
 }
