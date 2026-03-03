@@ -2147,57 +2147,84 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════════════
-   CONFIG — Update these to point to your Google Sheet
+   CONFIG — All tuneable settings live here. See ADMIN_GUIDE.md for details.
    ════════════════════════════════════════════════════════════════════ */
 const CONFIG = {
-  SHEET_ID:      '2PACX-1vQflvwcr6Nf1NVyvv45Jt7YWF3fxZO0ecaN8JwMYU4gQeghoYR7eLmkGS7zfSqdlA8VuiIhkQ4eCAYz',
-  SHEET_NAME:    'Routes',
-  SHEET_GID:     '429694098',
-  CAFES_GID:     '2092417686',           // Cafes tab
-  USE_DEMO_DATA: false,
-  SHOW_DEBUG:    false,          // true = show debug panel; false = hidden
-  WEATHER_ENABLED: true,         // true = fetch 7-day forecast from Open-Meteo
-  DEFAULT_RIDE_DAY: 'sunday',    // day the club typically rides
-  TARGET_DISTANCE: 40,           // default target distance in miles for ride planner
-  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',  // TomTom Traffic API key (free tier, 2500 req/day)
-  ROAD_CLOSURES_ENABLED: true,   // Set false to disable ALL TomTom traffic features (map icons, card overlays, per-route checks)
 
-  // Maps your actual sheet column headers → internal app field names (all lowercase keys)
+  // ── Google Sheets data source ──────────────────────────────────────
+  // The app reads route and café data from a publicly-published Google Sheet.
+  // To find these values:
+  //   1. Open the Google Sheet → File → Share → Publish to the web → CSV
+  //   2. SHEET_ID  — the long ID in the published URL between /e/ and /pub
+  //   3. SHEET_GID — the gid= parameter in the URL (each tab has a unique GID)
+  //   4. CAFES_GID — same, but for the Cafés tab
+  // The sheet must be published (not just shared) for CSV fetch to work.
+  SHEET_ID:      '2PACX-1vQflvwcr6Nf1NVyvv45Jt7YWF3fxZO0ecaN8JwMYU4gQeghoYR7eLmkGS7zfSqdlA8VuiIhkQ4eCAYz',
+  SHEET_NAME:    'Routes',       // Display name only — not used for fetching
+  SHEET_GID:     '429694098',    // GID for the Routes tab
+  CAFES_GID:     '2092417686',   // GID for the Cafés tab
+
+  // ── Development & debugging ────────────────────────────────────────
+  USE_DEMO_DATA: false,          // true = ignore Google Sheet, use hardcoded demo routes (for offline dev)
+  SHOW_DEBUG:    false,          // true = show diagnostics panel at bottom of page
+
+  // ── Weather forecast ───────────────────────────────────────────────
+  // Uses Open-Meteo API (free, no key needed, CORS-enabled).
+  // Forecast is for Swavesey (52.3063, -0.0004) — 7-day, cached 30 min.
+  WEATHER_ENABLED: true,         // false = hide weather strip and ride planner entirely
+
+  // ── Ride planner ───────────────────────────────────────────────────
+  DEFAULT_RIDE_DAY: 'sunday',    // Day the club typically rides — used to highlight the weather strip
+  TARGET_DISTANCE: 40,           // Default target distance (miles) for the ride-match scoring slider
+
+  // ── Road closures & roadworks (TomTom Traffic API) ─────────────────
+  // Free tier: 2,500 requests/day. Sign up at https://developer.tomtom.com
+  // Shows road closure icons on master map + coloured overlays on card maps.
+  // Roadworks are hidden by default; user toggles them on via sidebar switch.
+  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',
+  ROAD_CLOSURES_ENABLED: true,   // false = disable ALL TomTom features (no API calls made)
+
+  // ── Routes tab column mapping ──────────────────────────────────────
+  // Maps Google Sheet column headers (lowercase) → internal field names.
+  // If a sheet column header is NOT listed here, it passes through as-is
+  // (e.g. 'gpx_url' in the sheet becomes route.gpx_url automatically).
   COLUMN_MAP: {
-    'type':                            'type',           // 3rd column: Road/MTB
-    'ridable':                        'rideable',
-    'route name':                     'route_name',
-    'distance miles':                 'distance_miles',
-    'ascent (per garmin)':            'ascent_metres',
-    'garmin connect link':            'garmin_link',
-    'last ride':                      'last_ridden',
-    'busway segment':                 'busway_segment',
-    'speed':                          'recommended_speed_mph',
-    'time':                           'estimated_time_raw',  // decimal hours e.g. 1.746 — converted below
-    'time inc 30 minute coffee stop': 'time_with_coffee',
-    'roy group':                      'roy_group',
-    'new routes number':              'route_number',
-    'debrief':                        'notes_debrief',
-    'direction':                      'direction',
-    'notes':                          'notes',
-    'source':                         'source',
-    'comparison':                     'comparison',
-    'start_lat':                      'start_lat',
-    'start_long':                     'start_lon',      // CSV header is 'start_long'
+    'type':                            'type',                  // Road / MTB / Gravel
+    'ridable':                        'rideable',               // true/false — hide unrideable routes
+    'route name':                     'route_name',             // Display name shown on cards
+    'distance miles':                 'distance_miles',         // Total distance in miles
+    'ascent (per garmin)':            'ascent_metres',          // Total ascent in metres
+    'garmin connect link':            'garmin_link',            // Full URL to Garmin Connect route
+    'last ride':                      'last_ridden',            // Date text e.g. "10 Jan"
+    'busway segment':                 'busway_segment',         // yes/no — uses guided busway
+    'speed':                          'recommended_speed_mph',  // Suggested average speed (mph)
+    'time':                           'estimated_time_raw',     // Decimal hours e.g. 1.746 → "1 h 45 min"
+    'time inc 30 minute coffee stop': 'time_with_coffee',       // Pre-formatted time string
+    'roy group':                      'roy_group',              // Route author/group
+    'new routes number':              'route_number',           // Numeric ID shown on cards e.g. (27)
+    'debrief':                        'notes_debrief',          // Post-ride notes
+    'direction':                      'direction',              // Compass: N/NE/E/SE/S/SW/W/NW
+    'notes':                          'notes',                  // General notes
+    'source':                         'source',                 // Who created the route
+    'comparison':                     'comparison',             // Comparison notes
+    'start_lat':                      'start_lat',              // Start latitude (decimal degrees)
+    'start_long':                     'start_lon',              // Start longitude (decimal degrees)
+    // Unmapped columns pass through as-is. Key ones from the sheet:
+    //   'gpx_url'  — full URL to GPX file hosted in /gpx/ folder on same domain
   },
 
-  // Maps Cafes tab column headers → internal field names
+  // ── Cafés tab column mapping ───────────────────────────────────────
   CAFE_COLUMN_MAP: {
-    'n1':                    'route_ref',
-    'village':               'village',
-    'name':                  'cafe_name',
-    'rating':                'rating',
-    'notes':                 'notes',
-    'saturday':              'saturday_hours',
-    'sunday opening time':   'sunday_hours',
-    'lat':                   'lat',
-    'long':                  'lon',
-    'website':               'website',
+    'n1':                    'route_ref',       // Route number this café is on
+    'village':               'village',          // Village/town name
+    'name':                  'cafe_name',        // Café display name
+    'rating':                'rating',           // Star rating
+    'notes':                 'notes',            // Extra info
+    'saturday':              'saturday_hours',   // Saturday opening hours
+    'sunday opening time':   'sunday_hours',     // Sunday opening hours
+    'lat':                   'lat',              // Café latitude
+    'long':                  'lon',              // Café longitude
+    'website':               'website',          // Café website URL
   },
 };
 
