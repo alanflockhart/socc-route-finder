@@ -3200,8 +3200,12 @@ function scoreSundayRoutes(routes, weather, targetDist, dayWeather) {
   const day = dayWeather || (weather && weather.sunday);
   if (!day) return routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road').slice(0, 3);
 
-  // Only score Road rides for the planner
-  const roadRoutes = routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road');
+  // Only score Road rides for the planner, respecting busway toggle
+  const roadRoutes = routes.filter(r => {
+    if ((safe(r.type)||'Road').toLowerCase() !== 'road') return false;
+    if (state.excludeBusway && r.busway_segment === true) return false;
+    return true;
+  });
 
   return roadRoutes.map(route => {
     const dist = safeNum(route.distance_miles);
@@ -3238,8 +3242,8 @@ function formatDateNice(dateStr) {
 }
 
 function buildWindCompassSVG(windDir) {
-  // Arrow points in the direction wind is blowing TO (windDir + 180)
-  const rotation = windDir; // arrow shows where wind comes FROM (pointing down = from north)
+  // Arrow points in the direction wind is blowing TO
+  const rotation = (windDir + 180) % 360;
   return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
     <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
     <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(44,188,179,0.3)" stroke-width="2" stroke-dasharray="8 4"/>
@@ -3263,9 +3267,13 @@ function renderRidePlanner(weather, routes) {
   if (!weather || !weather.sunday) {
     if (advice) advice.textContent = 'Weather data unavailable — showing routes by distance match only.';
     if (weatherCard) weatherCard.innerHTML = '<div class="planner-no-weather">Weather unavailable</div>';
-    // Still show top picks by distance (road only)
+    // Still show top picks by distance (road only, respecting busway toggle)
     const targetDist = state.targetDistance || 40;
-    const roadRoutes = routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road');
+    const roadRoutes = routes.filter(r => {
+      if ((safe(r.type)||'Road').toLowerCase() !== 'road') return false;
+      if (state.excludeBusway && r.busway_segment === true) return false;
+      return true;
+    });
     const sorted = roadRoutes.slice().sort((a, b) => {
       return Math.abs(safeNum(a.distance_miles) - targetDist) - Math.abs(safeNum(b.distance_miles) - targetDist);
     }).slice(0, 3);
@@ -4345,9 +4353,13 @@ function initControls() {
     });
   });
 
-  // Busway toggle
+  // Busway toggle — also refresh ride planner picks
   document.getElementById('buswayToggle').addEventListener('change', e => {
-    state.excludeBusway = e.target.checked; applyFilters();
+    state.excludeBusway = e.target.checked;
+    applyFilters();
+    // Refresh ride planner to respect busway preference
+    const dayW = getSelectedDayWeather();
+    if (dayW) renderRidePlannerForDay(dayW);
   });
 
   // Roadworks toggle (closures are always shown; roadworks off by default)
