@@ -19,8 +19,10 @@ The **weather strip** at the top shows a 7-day forecast for Swavesey. The club r
 
 - The **Ride Planner** panel expands, showing wind direction, temperature, and conditions.
 - **Top Picks** appear — routes scored against the weather (tailwind out, headwind home = best).
-- Use the **Target Distance** slider to adjust how far you want to ride. Routes closest to your target score highest.
+- Use the **Target Distance** slider or the **[-] / [+] buttons** to adjust how far you want to ride. Routes closest to your target score highest.
 - A **wind compass** shows which direction the wind is blowing — the app automatically favours routes that give you a tailwind on the outward leg.
+
+**Your target distance is saved automatically** and will be remembered the next time you visit.
 
 ---
 
@@ -35,7 +37,7 @@ The default view shows route **cards** with key info at a glance:
 | Distance (mi) | Total route distance in miles |
 | Ascent (m) | Total climbing in metres |
 | Type | Road, MTB, or Gravel |
-| Direction | Compass direction from Swavesey (N/E/S/W) |
+| Direction | Precise compass direction (e.g. NW, SE) |
 | Ride time | Estimated time at suggested speed |
 | Inc. coffee | Time including a 30-minute coffee stop |
 | Speed | Suggested average speed in mph |
@@ -43,6 +45,7 @@ The default view shows route **cards** with key info at a glance:
 **Click a card** to expand it and see:
 
 - An interactive **map** showing the route, nearby cafes, and any road closures.
+- Small **chevron arrows** along the route line indicate the direction of travel.
 - An **elevation profile** chart.
 - Buttons to **View on Map**, **Download GPX**, open in **Garmin Connect**, or **Share** the route.
 
@@ -51,7 +54,7 @@ The default view shows route **cards** with key info at a glance:
 Click the **Map** tab to see all routes on a single map. Each route has:
 
 - A **coloured circle marker** at its start point — click for a popup summary.
-- A **coloured track line** showing the full GPX route.
+- A **coloured track line** showing the full GPX route with **direction arrows**.
 - Hover over a track to see its name; click for details.
 
 The map starts centred on the club HQ (Swavesey). If you filter to a specific type (e.g. MTB), it zooms to show those routes.
@@ -67,15 +70,17 @@ Open the **Filter Routes** sidebar to narrow down what you see:
 | Filter | How it works |
 |--------|-------------|
 | **Type** | All, Road, MTB, or Gravel |
-| **Distance** | Min/max range slider (miles) |
-| **Ascent** | Min/max range slider (metres) |
-| **Direction** | N / E / S / W checkboxes. Each covers 3 compass points (e.g. N = NW + N + NE) |
+| **Distance** | Min/max range slider (miles) with **[-] / [+] steppers** |
+| **Ascent** | Min/max range slider (metres) with **[-] / [+] steppers** |
+| **Direction** | 8 individual compass points (N, NE, E, SE, S, SW, W, NW). |
 | **Exclude Busway** | Hides routes that use the guided busway |
-| **Show Roadworks** | Toggles amber roadwork markers on the master map (off by default) |
+| **Road Closures** | 3-position toggle: **Off** (hide all), **Closures** (red icons), or **All** (red + amber roadworks). |
+
+**Settings are persistent:** The app remembers your filter choices, including directions, distance ranges, and closure modes, so they are ready for your next session.
 
 The **badge** on the filter header shows how many filters are active. The count (e.g. "14 of 14") updates live.
 
-**Reset all filters** clears everything back to defaults.
+**Reset all filters** clears everything back to defaults and removes saved preferences.
 
 ---
 
@@ -91,8 +96,9 @@ The **badge** on the filter header shows how many filters are active. The count 
 
 The app fetches live road closure data from TomTom:
 
-- **Red markers** on the master map = road closures (always visible).
-- **Amber markers** = roadworks (hidden by default — toggle on in the sidebar).
+- **Red markers** on the master map = road closures.
+- **Amber markers** = roadworks.
+- Toggle between viewing just closures or including all roadworks in the sidebar.
 - On **card maps**, closures and roadworks near the route are shown as bold coloured lines overlaid on the route.
 
 ---

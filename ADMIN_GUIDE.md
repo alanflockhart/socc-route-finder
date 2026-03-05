@@ -179,15 +179,10 @@ The app uses `localStorage` to avoid hammering external APIs on every page load.
 | Routes | `socc_routes_cache` | 1 hour | Parsed route data from Google Sheets |
 | Cafes | `socc_cafes_cache` | 1 hour | Parsed cafe data from Google Sheets |
 | Weather | `socc_weather_cache` | 30 min | 7-day forecast from Open-Meteo |
+| Prefs | `socc_user_prefs` | Permanent | User filter settings and target distance |
 | Closures | In-memory only | 30 min | TomTom road incident data |
 
-Users can clear the route/cafe cache by clicking **"Refresh data"** in the app.
-
-To clear all caches manually (e.g. during development), open the browser console and run:
-```js
-localStorage.clear();
-location.reload();
-```
+Users can clear the route/cafe cache by clicking **"Refresh data"** in the app. Preference clearing is handled by the **"Reset all filters"** button.
 
 ---
 
@@ -199,15 +194,13 @@ The app is hosted on **Netlify** (free tier). It deploys automatically from the 
 |---------|-------|
 | Repository | `github.com/alanflockhart/socc-route-finder` |
 | Production branch | `master` |
-| Preview branch | `v2` (Netlify generates a preview URL) |
 | Build command | None — no build step needed |
 | Publish directory | `/` (root) |
 
 ### Deploying Changes
 
 1. Push to `master` for production.
-2. Push to `v2` for preview/testing.
-3. Netlify deploys automatically within ~30 seconds.
+2. Netlify deploys automatically within ~30 seconds.
 
 ---
 
@@ -241,7 +234,6 @@ These are defined in the JavaScript but outside CONFIG. Change with care.
 | `WEATHER_CACHE_TTL` | ~line 2356 | Weather cache lifetime: `30 * 60 * 1000` (30 minutes) |
 | `CLOSURE_CACHE_TTL` | ~line 2479 | Road closure cache lifetime: `30 * 60 * 1000` (30 minutes) |
 | `GPX_PALETTE` | ~line 4556 | Array of 10 colours used to distinguish GPX routes on the master map |
-| `DIR_EXPAND` | ~line 3075 | Maps 4 cardinal filters to 8 compass points: `{N: ['NW','N','NE'], ...}` |
 | `WMO_CODES` | ~line 2359 | Maps weather codes to emoji icons and descriptions |
 
 ---

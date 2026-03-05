@@ -273,14 +273,20 @@
 
     /* Range sliders */
     .range-group { display: flex; flex-direction: column; gap: 0.3rem; }
-    .range-row { display: flex; align-items: center; gap: 0.5rem; }
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
     .range-val {
       font-size: 0.75rem;
       font-family: var(--font-mono);
       color: var(--dark);
       font-weight: 600;
-      min-width: 48px;
+      min-width: 52px;
       text-align: right;
+      flex-shrink: 0;
     }
     input[type="range"] {
       flex: 1;
@@ -289,6 +295,7 @@
       border-radius: 2px;
       background: var(--grey-200);
       outline: none;
+      min-width: 0;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
@@ -328,6 +335,7 @@
 
     /* Checkbox grid */
     .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+    .checkbox-grid-4col { grid-template-columns: repeat(4, 1fr); }
     .check-item {
       display: flex;
       align-items: center;
@@ -1075,9 +1083,37 @@
       letter-spacing: 0.06em;
       white-space: nowrap;
     }
+    .planner-slider-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+      min-width: 200px;
+    }
+    .stepper-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 1.5px solid rgba(44,188,179,0.3);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      line-height: 1;
+      padding-bottom: 2px;
+    }
+    .stepper-btn:hover {
+      background: var(--teal-dim);
+      border-color: var(--teal);
+      color: var(--teal-light);
+    }
     .planner-slider {
       flex: 1;
-      min-width: 120px;
       -webkit-appearance: none;
       height: 4px;
       border-radius: 2px;
@@ -1099,6 +1135,17 @@
       color: var(--teal-light);
       font-family: var(--font-mono);
       min-width: 52px;
+    }
+
+    @media (max-width: 600px) {
+      .planner-slider::-webkit-slider-thumb {
+        width: 28px;
+        height: 28px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        width: 28px;
+        height: 28px;
+      }
     }
 
     /* Weather card sidebar */
@@ -1857,7 +1904,11 @@
 
       <div class="planner-controls">
         <span class="planner-control-label">Target distance</span>
-        <input type="range" class="planner-slider" id="plannerDist" min="10" max="130" value="40" step="5">
+        <div class="planner-slider-group">
+          <button class="stepper-btn" onclick="adjustPlannerDist(-5)" aria-label="Decrease distance by 5 miles">−</button>
+          <input type="range" class="planner-slider" id="plannerDist" min="10" max="130" value="40" step="5">
+          <button class="stepper-btn" onclick="adjustPlannerDist(5)" aria-label="Increase distance by 5 miles">+</button>
+        </div>
         <span class="planner-slider-val" id="plannerDistVal">40 mi</span>
       </div>
 
@@ -1992,14 +2043,18 @@
           <span class="filter-label">Distance (miles)</span>
           <div class="range-group">
             <div class="range-row">
-              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Min</span>
+              <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Min</span>
+              <button class="stepper-btn" onclick="adjustRange('distMin', -1)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="distMin" min="0" max="160" value="0" step="1">
+              <button class="stepper-btn" onclick="adjustRange('distMin', 1)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
               <span class="range-val" id="distMinVal">0 mi</span>
             </div>
             <div class="range-row">
-              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Max</span>
+              <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Max</span>
+              <button class="stepper-btn" onclick="adjustRange('distMax', -5)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="distMax" min="0" max="160" value="160" step="5">
-              <span class="range-val" id="distMaxVal">100 mi</span>
+              <button class="stepper-btn" onclick="adjustRange('distMax', 5)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
+              <span class="range-val" id="distMaxVal">160 mi</span>
             </div>
           </div>
         </div>
@@ -2009,14 +2064,18 @@
           <span class="filter-label">Ascent (metres)</span>
           <div class="range-group">
             <div class="range-row">
-              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Min</span>
+              <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Min</span>
+              <button class="stepper-btn" onclick="adjustRange('ascentMin', -50)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="ascentMin" min="0" max="1000" value="0" step="10">
+              <button class="stepper-btn" onclick="adjustRange('ascentMin', 50)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
               <span class="range-val" id="ascentMinVal">0 m</span>
             </div>
             <div class="range-row">
-              <span style="font-size:0.7rem;color:var(--grey-400);width:20px">Max</span>
+              <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Max</span>
+              <button class="stepper-btn" onclick="adjustRange('ascentMax', -100)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="ascentMax" min="0" max="2500" value="2500" step="25">
-              <span class="range-val" id="ascentMaxVal">1000 m</span>
+              <button class="stepper-btn" onclick="adjustRange('ascentMax', 100)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
+              <span class="range-val" id="ascentMaxVal">2500 m</span>
             </div>
           </div>
         </div>
@@ -2024,11 +2083,15 @@
         <!-- Direction -->
         <div class="filter-group">
           <span class="filter-label">Direction</span>
-          <div class="checkbox-grid" id="dirChecks">
+          <div class="checkbox-grid checkbox-grid-4col" id="dirChecks">
             <label class="check-item"><input type="checkbox" value="N" checked> N</label>
+            <label class="check-item"><input type="checkbox" value="NE" checked> NE</label>
             <label class="check-item"><input type="checkbox" value="E" checked> E</label>
+            <label class="check-item"><input type="checkbox" value="SE" checked> SE</label>
             <label class="check-item"><input type="checkbox" value="S" checked> S</label>
+            <label class="check-item"><input type="checkbox" value="SW" checked> SW</label>
             <label class="check-item"><input type="checkbox" value="W" checked> W</label>
+            <label class="check-item"><input type="checkbox" value="NW" checked> NW</label>
           </div>
         </div>
 
@@ -2052,12 +2115,11 @@
               <span class="switch-track"></span>
             </label>
           </div>
-          <div class="switch-row">
-            <span class="switch-label">🚧 Show roadworks</span>
-            <label class="switch">
-              <input type="checkbox" id="roadworksToggle">
-              <span class="switch-track"></span>
-            </label>
+          <span class="filter-label" style="margin-top:0.5rem">Road closures</span>
+          <div class="toggle-group" id="closureModeToggle">
+            <button class="toggle-btn" data-val="off">Off</button>
+            <button class="toggle-btn active" data-val="closures">Closures</button>
+            <button class="toggle-btn" data-val="all">All</button>
           </div>
         </div>
 
@@ -2701,7 +2763,7 @@ const state = {
   directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
   mapDisplay: 'all',  // 'routes' | 'all' | 'cafes'
   excludeBusway: false,
-  showRoadworks: false,
+  closureMode: 'closures',  // 'off' | 'closures' | 'all'
   sort: 'name',
   targetDistance: CONFIG.TARGET_DISTANCE,  // for ride planner
   selectedDayIdx: null,  // index into weatherData.daily (null = default ride day)
@@ -3258,6 +3320,22 @@ function buildWindCompassSVG(windDir) {
   </svg>`;
 }
 
+function adjustPlannerDist(delta) {
+  const slider = document.getElementById('plannerDist');
+  if (!slider) return;
+  const newVal = Math.min(Math.max(parseInt(slider.min), parseInt(slider.value) + delta), parseInt(slider.max));
+  slider.value = newVal;
+  slider.dispatchEvent(new Event('input')); // trigger the 'input' handler to refresh picks
+}
+
+function adjustRange(id, delta) {
+  const slider = document.getElementById(id);
+  if (!slider) return;
+  const newVal = Math.min(Math.max(parseInt(slider.min), parseInt(slider.value) + delta), parseInt(slider.max));
+  slider.value = newVal;
+  slider.dispatchEvent(new Event('input'));
+}
+
 function renderRidePlanner(weather, routes) {
   const advice = document.getElementById('plannerAdvice');
   const picksContainer = document.getElementById('plannerPicks');
@@ -3298,6 +3376,9 @@ function renderRidePlanner(weather, routes) {
       state.targetDistance = parseInt(this.value, 10);
       const valEl = document.getElementById('plannerDistVal');
       if (valEl) valEl.textContent = state.targetDistance + ' mi';
+      
+      savePrefs(); // PERSIST CHANGE
+      
       // Re-score using the currently selected day
       const dayWeather = getSelectedDayWeather();
       const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance, dayWeather);
@@ -4041,6 +4122,7 @@ function buildCard(route, idx) {
 function toggleMap(slug, idx) {
   const panel = document.getElementById(`mapPanel-${slug}`);
   const btn   = document.getElementById(`mapBtn-${slug}`);
+  if (!panel || !btn) return;
   const isOpen = panel.classList.contains('open');
 
   if (isOpen) {
@@ -4048,16 +4130,42 @@ function toggleMap(slug, idx) {
     btn.classList.remove('active');
     btn.textContent = '📍 View on Map';
     delete openMaps[slug];
+    // Cleanup instances to save memory
+    if (leafletMaps[slug]) { leafletMaps[slug].remove(); delete leafletMaps[slug]; }
+    if (elevCharts[slug]) { elevCharts[slug].destroy(); delete elevCharts[slug]; }
   } else {
-    panel.classList.add('open');
-    btn.classList.add('active');
-    btn.textContent = '🗺 Hide Map';
-    openMaps[slug] = true;
     const route = filteredRoutes[idx];
-    setTimeout(() => initMap(slug, route), 80);
-
-    // Road closures are shown on card map via addClosuresToCardMap() — no per-route API calls
+    openMaps[slug] = true;
+    openMapForCard(route, idx, slug);
   }
+}
+
+/**
+ * Re-initializes a map and chart on a specific card.
+ * Used both by toggleMap and to restore maps after renderCards() replaces the DOM.
+ */
+function openMapForCard(route, idx, slug) {
+  const panel = document.getElementById(`mapPanel-${slug}`);
+  const btn   = document.getElementById(`mapBtn-${slug}`);
+  if (!panel || !btn) return;
+
+  panel.classList.add('open');
+  btn.classList.add('active');
+  btn.textContent = '🗺 Hide Map';
+
+  // CRITICAL: If an instance already exists in our registry, it's attached to an old 
+  // DOM element that was just blown away by renderCards. We must remove it.
+  if (leafletMaps[slug]) {
+    try { leafletMaps[slug].remove(); } catch(e) {}
+    delete leafletMaps[slug];
+  }
+  if (elevCharts[slug]) {
+    try { elevCharts[slug].destroy(); } catch(e) {}
+    delete elevCharts[slug];
+  }
+
+  // Brief delay to ensure DOM is ready and transitioned
+  setTimeout(() => initMap(slug, route), 80);
 }
 
 const leafletMaps = {};
@@ -4108,6 +4216,55 @@ function addCafesToMap(map, fontSize) {
   });
 }
 
+function calcBearing(a, b) {
+  const dLon = (b.lng - a.lng) * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(b.lat * Math.PI / 180);
+  const x = Math.cos(a.lat * Math.PI / 180) * Math.sin(b.lat * Math.PI / 180) -
+            Math.sin(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.cos(dLon);
+  const brng = Math.atan2(y, x) * 180 / Math.PI;
+  return (brng + 360) % 360;
+}
+
+function addDirectionArrows(container, gpxLayer) {
+  const points = [];
+  gpxLayer.eachLayer(l => {
+    if (l.getLatLngs) {
+      const lls = l.getLatLngs();
+      if (lls.length > 0 && lls[0] instanceof L.LatLng) {
+        lls.forEach(ll => points.push(ll));
+      } else if (Array.isArray(lls[0])) {
+        lls.forEach(arr => arr.forEach(ll => points.push(ll)));
+      }
+    }
+  });
+  if (points.length < 2) return;
+
+  const ARROW_INTERVAL_M = 12000; // ~7.5 miles (12km)
+  let accumulatedDist = 0;
+  const colour = gpxLayer.options.polyline_options.color || '#e8621a';
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i+1];
+    const d = p1.distanceTo(p2);
+    accumulatedDist += d;
+
+    if (accumulatedDist >= ARROW_INTERVAL_M) {
+      const bearing = calcBearing(p1, p2);
+      const icon = L.divIcon({
+        className: '',
+        html: `<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${bearing}deg); filter: drop-shadow(0 0 1.5px white); opacity:0.85; pointer-events:none; display:block;">
+                 <path d="M3 10L7 6L11 10" stroke="${colour}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+               </svg>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      L.marker(p2, { icon, interactive: false }).addTo(container);
+      accumulatedDist = 0;
+    }
+  }
+}
+
 function initMap(slug, route) {
   if (leafletMaps[slug]) {
     leafletMaps[slug].invalidateSize();
@@ -4146,6 +4303,7 @@ function initMap(slug, route) {
     }).on('loaded', function(e) {
       map.fitBounds(e.target.getBounds());
       buildElevationChart(slug, e.target);
+      addDirectionArrows(map, e.target);
       // Add café markers once the map settles to the new bounds
       map.once('moveend', function() {
             addCafesToMap(map, 22);
@@ -4280,7 +4438,10 @@ function resetFilters() {
   state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']); // all 8 when all 4 cardinals checked
   state.mapDisplay = 'all';
   state.excludeBusway = false;
-  state.showRoadworks = false;
+  state.closureMode = 'closures';
+
+  // Clear saved preferences
+  localStorage.removeItem(PREFS_KEY);
 
   // Reset map position flag so view centres on HQ again
   if (masterMapInstance) masterMapInstance._userMoved = false;
@@ -4295,8 +4456,8 @@ function resetFilters() {
   document.getElementById('ascentMinVal').textContent = '0 m';
   document.getElementById('ascentMaxVal').textContent = '2500 m';
   document.getElementById('buswayToggle').checked = false;
-  document.getElementById('roadworksToggle').checked = false;
-  if (masterRoadworkLayer && masterMapInstance) masterMapInstance.removeLayer(masterRoadworkLayer);
+  document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'closures'));
+  updateClosureLayers();
   document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
   document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
@@ -4307,13 +4468,123 @@ function resetFilters() {
 /* ════════════════════════════════════════════════════════════════════
    INIT
    ════════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   USER PREFERENCES — persist filter settings across sessions
+   ════════════════════════════════════════════════════════════════════ */
+const PREFS_KEY = 'socc_user_prefs';
+
+function savePrefs() {
+  try {
+    const prefs = {
+      targetDistance: state.targetDistance,
+      excludeBusway: state.excludeBusway,
+      closureMode: state.closureMode,
+      directions: [...state.directions],
+      sort: state.sort,
+      type: state.type,
+      distMin: state.distMin,
+      distMax: state.distMax,
+      ascentMin: state.ascentMin,
+      ascentMax: state.ascentMax
+    };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (e) { /* localStorage full or disabled */ }
+}
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return;
+    const prefs = JSON.parse(raw);
+
+    // Validate and apply each preference
+    if (typeof prefs.targetDistance === 'number' && prefs.targetDistance >= 10 && prefs.targetDistance <= 130) {
+      state.targetDistance = prefs.targetDistance;
+      const slider = document.getElementById('plannerDist');
+      if (slider) { slider.value = prefs.targetDistance; }
+      const label = document.getElementById('plannerDistVal');
+      if (label) label.textContent = prefs.targetDistance + ' mi';
+    }
+
+    // Sidebar Distance
+    if (typeof prefs.distMin === 'number') {
+      state.distMin = prefs.distMin;
+      const el = document.getElementById('distMin');
+      if (el) el.value = prefs.distMin;
+      const label = document.getElementById('distMinVal');
+      if (label) label.textContent = prefs.distMin + ' mi';
+    }
+    if (typeof prefs.distMax === 'number') {
+      state.distMax = prefs.distMax;
+      const el = document.getElementById('distMax');
+      if (el) el.value = prefs.distMax;
+      const label = document.getElementById('distMaxVal');
+      if (label) label.textContent = prefs.distMax + ' mi';
+    }
+
+    // Sidebar Ascent
+    if (typeof prefs.ascentMin === 'number') {
+      state.ascentMin = prefs.ascentMin;
+      const el = document.getElementById('ascentMin');
+      if (el) el.value = prefs.ascentMin;
+      const label = document.getElementById('ascentMinVal');
+      if (label) label.textContent = prefs.ascentMin + ' m';
+    }
+    if (typeof prefs.ascentMax === 'number') {
+      state.ascentMax = prefs.ascentMax;
+      const el = document.getElementById('ascentMax');
+      if (el) el.value = prefs.ascentMax;
+      const label = document.getElementById('ascentMaxVal');
+      if (label) label.textContent = prefs.ascentMax + ' m';
+    }
+
+    if (typeof prefs.excludeBusway === 'boolean') {
+      state.excludeBusway = prefs.excludeBusway;
+      const cb = document.getElementById('buswayToggle');
+      if (cb) cb.checked = prefs.excludeBusway;
+    }
+
+    if (['off', 'closures', 'all'].includes(prefs.closureMode)) {
+      state.closureMode = prefs.closureMode;
+      document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === prefs.closureMode));
+    }
+
+    if (Array.isArray(prefs.directions) && prefs.directions.length > 0) {
+      const valid = ['N','NE','E','SE','S','SW','W','NW'];
+      const dirs = prefs.directions.filter(d => valid.includes(d));
+      if (dirs.length > 0) {
+        state.directions = new Set(dirs);
+        document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
+          cb.checked = dirs.includes(cb.value);
+        });
+      }
+    }
+
+    if (typeof prefs.sort === 'string') {
+      state.sort = prefs.sort;
+      const sel = document.getElementById('sortSelect');
+      if (sel) sel.value = prefs.sort;
+    }
+
+    if (typeof prefs.type === 'string') {
+      state.type = prefs.type;
+      document.querySelectorAll('#typeToggle .toggle-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === prefs.type));
+    }
+  } catch (e) { /* corrupt data — ignore */ }
+}
+
 function initControls() {
+  loadPrefs();
+
   // Type toggle
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.type = btn.dataset.val;
+      savePrefs();
       applyFilters();
     });
   });
@@ -4326,19 +4597,17 @@ function initControls() {
       const unit = id.startsWith('dist') ? ' mi' : ' m';
       document.getElementById(labelId).textContent = v + unit;
       state[id] = parseInt(v);
+      savePrefs();
       debouncedFilter();
     });
   });
 
-  // Direction checkboxes — each cardinal covers itself + adjacent intercardinals
-  // N → NW, N, NE | E → NE, E, SE | S → SE, S, SW | W → SW, W, NW
-  const DIR_EXPAND = { N: ['NW','N','NE'], E: ['NE','E','SE'], S: ['SE','S','SW'], W: ['SW','W','NW'] };
+  // Direction checkboxes — 8 individual compass points
   document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', () => {
       const checked = [...document.querySelectorAll('#dirChecks input:checked')].map(c => c.value);
-      const expanded = new Set();
-      checked.forEach(cardinal => (DIR_EXPAND[cardinal] || [cardinal]).forEach(d => expanded.add(d)));
-      state.directions = expanded;
+      state.directions = new Set(checked);
+      savePrefs();
       debouncedFilter();
     });
   });
@@ -4356,27 +4625,29 @@ function initControls() {
   // Busway toggle — also refresh ride planner picks
   document.getElementById('buswayToggle').addEventListener('change', e => {
     state.excludeBusway = e.target.checked;
+    savePrefs();
     applyFilters();
     // Refresh ride planner to respect busway preference
     const dayW = getSelectedDayWeather();
     if (dayW) renderRidePlannerForDay(dayW);
   });
 
-  // Roadworks toggle (closures are always shown; roadworks off by default)
-  document.getElementById('roadworksToggle').addEventListener('change', e => {
-    state.showRoadworks = e.target.checked;
-    if (masterRoadworkLayer && masterMapInstance) {
-      if (state.showRoadworks) {
-        masterMapInstance.addLayer(masterRoadworkLayer);
-      } else {
-        masterMapInstance.removeLayer(masterRoadworkLayer);
-      }
-    }
+  // Closure mode toggle (Off / Closures / All)
+  document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.closureMode = btn.dataset.val;
+      savePrefs();
+      updateClosureLayers();
+    });
   });
 
   // Sort
   document.getElementById('sortSelect').addEventListener('change', e => {
-    state.sort = e.target.value; applyFilters();
+    state.sort = e.target.value;
+    savePrefs();
+    applyFilters();
   });
 
   // Reset
@@ -4443,8 +4714,8 @@ let masterMapInstance = null;
 let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
 let masterCafeLayer   = null;  // café markers — middle layer
 let masterGpxLayer    = null;  // GPX track lines — bottom layer, interactive with popup + hover
-let masterClosureLayer = null;  // road closure icons (always visible)
-let masterRoadworkLayer = null; // roadwork icons (toggle, off by default)
+let masterClosureLayer = null;  // road closure icons (closureMode: closures/all)
+let masterRoadworkLayer = null; // roadwork icons (closureMode: all only)
 let currentView = 'list';
 
 function switchView(view) {
@@ -4650,6 +4921,7 @@ async function refreshMasterMap() {
 
         // Add to the BOTTOM layer so circle markers always sit on top and receive clicks first
         masterGpxLayer.addLayer(e.target);
+        addDirectionArrows(masterGpxLayer, e.target);
       }).on('error', function() {
         // GPX load failed silently — marker still shows
       });
@@ -4674,17 +4946,42 @@ async function refreshMasterMap() {
   // Overlay road closures — ensure layers are on the master map
   if (CONFIG.ROAD_CLOSURES_ENABLED && CONFIG.TOMTOM_API_KEY) {
     loadMapClosures().then(() => {
-      if (masterClosureLayer && !masterMapInstance.hasLayer(masterClosureLayer)) {
-        masterMapInstance.addLayer(masterClosureLayer);
-      }
-      if (masterRoadworkLayer && state.showRoadworks && !masterMapInstance.hasLayer(masterRoadworkLayer)) {
-        masterMapInstance.addLayer(masterRoadworkLayer);
-      }
+      updateClosureLayers();
     }).catch(() => {});
   }
 }
 
 /** Fetch all road closures/roadworks for the route area and overlay on maps */
+/** Update master map closure/roadwork layers based on state.closureMode */
+function updateClosureLayers() {
+  if (!masterMapInstance) return;
+  if (state.closureMode === 'off') {
+    if (masterClosureLayer && masterMapInstance.hasLayer(masterClosureLayer)) masterMapInstance.removeLayer(masterClosureLayer);
+    if (masterRoadworkLayer && masterMapInstance.hasLayer(masterRoadworkLayer)) masterMapInstance.removeLayer(masterRoadworkLayer);
+  } else if (state.closureMode === 'closures') {
+    if (masterClosureLayer && !masterMapInstance.hasLayer(masterClosureLayer)) masterMapInstance.addLayer(masterClosureLayer);
+    if (masterRoadworkLayer && masterMapInstance.hasLayer(masterRoadworkLayer)) masterMapInstance.removeLayer(masterRoadworkLayer);
+  } else { // 'all'
+    if (masterClosureLayer && !masterMapInstance.hasLayer(masterClosureLayer)) masterMapInstance.addLayer(masterClosureLayer);
+    if (masterRoadworkLayer && !masterMapInstance.hasLayer(masterRoadworkLayer)) masterMapInstance.addLayer(masterRoadworkLayer);
+  }
+  // Refresh all open card maps
+  Object.keys(leafletMaps).forEach(slug => {
+    const map = leafletMaps[slug];
+    if (map) refreshCardMapClosures(map);
+  });
+}
+
+/** Remove and re-add closure overlays on a card map based on closureMode */
+function refreshCardMapClosures(map) {
+  // Remove existing closure overlays
+  const toRemove = [];
+  map.eachLayer(l => { if (l._isClosureOverlay) toRemove.push(l); });
+  toRemove.forEach(l => map.removeLayer(l));
+  // Re-add if mode allows
+  if (state.closureMode !== 'off') addClosuresToCardMap(map);
+}
+
 let _closuresLoaded = false;
 let _closureIncidents = []; // stored for reuse by card maps
 let _pendingClosureMaps = []; // card maps awaiting closure data
@@ -4796,7 +5093,7 @@ async function loadMapClosures() {
       }
     });
 
-    dbg(`TomTom: ${closureCount} closures (always shown) + ${roadworkCount} roadworks (toggle) on map`, true);
+    dbg(`TomTom: ${closureCount} closures + ${roadworkCount} roadworks loaded`, true);
     _closuresLoaded = true;
 
     // Process any card maps that opened before closure data was ready
@@ -4854,6 +5151,9 @@ function addClosuresToCardMap(map) {
   let added = 0;
 
   _closureIncidents.forEach(inc => {
+    // Filter by closureMode: 'closures' = closures only, 'all' = closures + roadworks
+    if (state.closureMode === 'closures' && !inc._isClosure) return;
+
     // Check if closure midpoint is within PROXIMITY_M of any sampled route point
     const nearRoute = sampled.some(rp => distM(inc._midLat, inc._midLon, rp.lat, rp.lng) < PROXIMITY_M);
     if (!nearRoute) return;
@@ -4863,11 +5163,12 @@ function addClosuresToCardMap(map) {
 
     // Glow/outline layer underneath for visibility
     const glow = L.polyline(inc._latLngs, {
-      color: inc._isClosure ? '#000' : '#000',
+      color: '#000',
       weight: 12,
       opacity: 0.3,
       lineCap: 'round',
     });
+    glow._isClosureOverlay = true;
     glow.addTo(map);
 
     // Main coloured line on top — thick and bold
@@ -4882,6 +5183,7 @@ function addClosuresToCardMap(map) {
     line.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
     line.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
 
+    line._isClosureOverlay = true;
     line.on('mouseover', function() { this.setStyle({ weight: 10, opacity: 1 }); });
     line.on('mouseout', function() { this.setStyle({ weight: 7, opacity: 0.95 }); });
 
