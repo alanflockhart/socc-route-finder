@@ -264,6 +264,31 @@ export function initControls() {
 
   document.getElementById('regionSelect').addEventListener('change', e => {
     state.region = e.target.value;
+
+    // Reset distance/ascent filters so routes in the new region aren't hidden
+    const regionRoutes = allRoutes.filter(r => {
+      if (state.region === 'all') return true;
+      return (r.region || 'Cambridge Core') === state.region;
+    });
+    if (regionRoutes.length > 0) {
+      const maxDist = Math.ceil(Math.max(...regionRoutes.map(r => parseFloat(r.distance_miles) || 0)) / 10) * 10;
+      const maxAscent = Math.ceil(Math.max(...regionRoutes.map(r => parseFloat(r.ascent_metres) || 0)) / 100) * 100;
+      state.distMin = 0; state.distMax = maxDist;
+      state.ascentMin = 0; state.ascentMax = maxAscent;
+      const distMinEl = document.getElementById('distMin');
+      const distMaxEl = document.getElementById('distMax');
+      const ascentMinEl = document.getElementById('ascentMin');
+      const ascentMaxEl = document.getElementById('ascentMax');
+      if (distMinEl)   { distMinEl.value = 0; document.getElementById('distMinVal').textContent = '0 mi'; }
+      if (distMaxEl)   { distMaxEl.max = maxDist; distMaxEl.value = maxDist; document.getElementById('distMaxVal').textContent = maxDist + ' mi'; }
+      if (ascentMinEl) { ascentMinEl.value = 0; document.getElementById('ascentMinVal').textContent = '0 m'; }
+      if (ascentMaxEl) { ascentMaxEl.max = maxAscent; ascentMaxEl.value = maxAscent; document.getElementById('ascentMaxVal').textContent = maxAscent + ' m'; }
+    }
+
+    // Reset map position so it re-fits to the new region
+    const map = getMasterMap();
+    if (map) map._userMoved = false;
+
     savePrefs();
     applyFilters();
   });
