@@ -444,7 +444,8 @@ export async function refreshMasterMap() {
     return;
   }
 
-  const bounds = [[SWAVESEY.lat, SWAVESEY.lon]];
+  const isLocalRegion = !state.region || state.region === 'Cambridge Core' || state.region === 'all';
+  const bounds = isLocalRegion ? [[SWAVESEY.lat, SWAVESEY.lon]] : [];
 
   const GPX_PALETTE = ['#e8621a','#2563eb','#16a34a','#9333ea','#dc2626','#0891b2','#d97706','#be185d','#059669','#7c3aed'];
   const GPX_DASHES = [null, '12 6', '4 6', '12 4 4 4'];
@@ -492,11 +493,11 @@ export async function refreshMasterMap() {
   });
 
   if (!masterMapInstance._userMoved) {
-    const isDefaultView = state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
+    const isDefaultView = isLocalRegion && state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
     masterMapInstance._programmaticMove = true;
     if (isDefaultView) {
       masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
-    } else {
+    } else if (bounds.length > 0) {
       masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
     }
     setTimeout(() => { masterMapInstance._programmaticMove = false; }, 500);
