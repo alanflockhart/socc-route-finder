@@ -55,9 +55,12 @@ export function normaliseGpxUrl(url) {
     return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
   }
 
-  // Dropbox share link → direct download (dl=1)
+  // Dropbox share link → CORS-friendly direct download via dl.dropboxusercontent.com
   if (trimmed.includes('dropbox.com')) {
-    return trimmed.replace(/[?&]dl=0/, '?dl=1').replace(/([^?])$/, '$1?dl=1');
+    return trimmed
+      .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+      .replace(/[?&]dl=[01]/, '')
+      .replace(/&st=[^&]*/, '');
   }
 
   return trimmed;
