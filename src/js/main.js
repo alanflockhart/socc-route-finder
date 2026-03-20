@@ -2833,3 +2833,9 @@ async function init() {
 
 init();
 
+
+// Expose UI functions to global window for inline HTML handlers
+window.adjustPlannerDist = adjustPlannerDist;
+window.adjustRange = adjustRange;
+window.clearCache = clearCache;
+window.resetFilters = resetFilters;
