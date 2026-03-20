@@ -1,0 +1,3052 @@
+  // Hide debug panel immediately if SHOW_DEBUG is false — avoids flash of panel on load
+  // (CONFIG is defined later in the main script block, so we check a data attribute instead)
+  document.getElementById('debugPanel').dataset.managed = '1';
+
+/* ════════════════════════════════════════════════════════════════════
+   CONFIG — All tuneable settings live here. See ADMIN_GUIDE.md for details.
+   ════════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+
+  // ── Google Sheets data source ──────────────────────────────────────
+  // The app reads route and café data from a publicly-published Google Sheet.
+  // To find these values:
+  //   1. Open the Google Sheet → File → Share → Publish to the web → CSV
+  //   2. SHEET_ID  — the long ID in the published URL between /e/ and /pub
+  //   3. SHEET_GID — the gid= parameter in the URL (each tab has a unique GID)
+  //   4. CAFES_GID — same, but for the Cafés tab
+  // The sheet must be published (not just shared) for CSV fetch to work.
+  SHEET_ID:      '2PACX-1vQflvwcr6Nf1NVyvv45Jt7YWF3fxZO0ecaN8JwMYU4gQeghoYR7eLmkGS7zfSqdlA8VuiIhkQ4eCAYz',
+  SHEET_NAME:    'Routes',       // Display name only — not used for fetching
+  SHEET_GID:     '429694098',    // GID for the Routes tab
+  CAFES_GID:     '2092417686',   // GID for the Cafés tab
+
+  // ── Development & debugging ────────────────────────────────────────
+  USE_DEMO_DATA: false,          // true = ignore Google Sheet, use hardcoded demo routes (for offline dev)
+  SHOW_DEBUG:    false,          // true = show diagnostics panel at bottom of page
+
+  // ── Weather forecast ───────────────────────────────────────────────
+  // Uses Open-Meteo API (free, no key needed, CORS-enabled).
+  // Forecast is for Swavesey (52.3063, -0.0004) — 7-day, cached 30 min.
+  WEATHER_ENABLED: true,         // false = hide weather strip and ride planner entirely
+
+  // ── Ride planner ───────────────────────────────────────────────────
+  DEFAULT_RIDE_DAY: 'sunday',    // Day the club typically rides — used to highlight the weather strip
+  TARGET_DISTANCE: 40,           // Default target distance (miles) for the ride-match scoring slider
+
+  // ── Road closures & roadworks (TomTom Traffic API) ─────────────────
+  // Free tier: 2,500 requests/day. Sign up at https://developer.tomtom.com
+  // Shows road closure icons on master map + coloured overlays on card maps.
+  // Roadworks are hidden by default; user toggles them on via sidebar switch.
+  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',
+  ROAD_CLOSURES_ENABLED: true,   // false = disable ALL TomTom features (no API calls made)
+
+  // ── Routes tab column mapping ──────────────────────────────────────
+  // Maps Google Sheet column headers (lowercase) → internal field names.
+  // If a sheet column header is NOT listed here, it passes through as-is
+  // (e.g. 'gpx_url' in the sheet becomes route.gpx_url automatically).
+  COLUMN_MAP: {
+    'type':                            'type',                  // Road / MTB / Gravel
+    'ridable':                        'rideable',               // true/false — hide unrideable routes
+    'route name':                     'route_name',             // Display name shown on cards
+    'distance miles':                 'distance_miles',         // Total distance in miles
+    'ascent (per garmin)':            'ascent_metres',          // Total ascent in metres
+    'garmin connect link':            'garmin_link',            // Full URL to Garmin Connect route
+    'last ride':                      'last_ridden',            // Date text e.g. "10 Jan"
+    'busway segment':                 'busway_segment',         // yes/no — uses guided busway
+    'speed':                          'recommended_speed_mph',  // Suggested average speed (mph)
+    'time':                           'estimated_time_raw',     // Decimal hours e.g. 1.746 → "1 h 45 min"
+    'time inc 30 minute coffee stop': 'time_with_coffee',       // Pre-formatted time string
+    'roy group':                      'roy_group',              // Route author/group
+    'new routes number':              'route_number',           // Numeric ID shown on cards e.g. (27)
+    'debrief':                        'notes_debrief',          // Post-ride notes
+    'direction':                      'direction',              // Compass: N/NE/E/SE/S/SW/W/NW
+    'notes':                          'notes',                  // General notes
+    'source':                         'source',                 // Who created the route
+    'comparison':                     'comparison',             // Comparison notes
+    'start_lat':                      'start_lat',              // Start latitude (decimal degrees)
+    'start_long':                     'start_lon',              // Start longitude (decimal degrees)
+    // Unmapped columns pass through as-is. Key ones from the sheet:
+    //   'gpx_url'  — full URL to GPX file hosted in /gpx/ folder on same domain
+  },
+
+  // ── Cafés tab column mapping ───────────────────────────────────────
+  CAFE_COLUMN_MAP: {
+    'n1':                    'route_ref',       // Route number this café is on
+    'village':               'village',          // Village/town name
+    'name':                  'cafe_name',        // Café display name
+    'rating':                'rating',           // Star rating
+    'notes':                 'notes',            // Extra info
+    'saturday':              'saturday_hours',   // Saturday opening hours
+    'sunday opening time':   'sunday_hours',     // Sunday opening hours
+    'lat':                   'lat',              // Café latitude
+    'long':                  'lon',              // Café longitude
+    'website':               'website',          // Café website URL
+  },
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   DEMO DATA — Representative sample for development / preview
+   ════════════════════════════════════════════════════════════════════ */
+const DEMO_ROUTES = [
+  {
+    route_name: "Johnson's Old Hurst",
+    type: "Road", direction: "NW",
+    distance_miles: 27.07, ascent_metres: 119,
+    estimated_time: "1 h 45 min", time_with_coffee: "2 h 15 min",
+    recommended_speed_mph: 15.5,
+    cafe_name: "Johnson's Coffee Shop",
+    cafe_hours: "Tue–Fri 7am–4pm, Sat–Sun 9am–2pm, Closed Mon",
+    cafe_maps_url: "https://maps.google.com/?q=52.36,-0.09",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "10 Jan", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Roy's route", date_added: "2024-01-01",
+  },
+  {
+    route_name: "Ely Cathedral Loop",
+    type: "Road", direction: "N",
+    distance_miles: 38.4, ascent_metres: 85,
+    estimated_time: "2 h 30 min", time_with_coffee: "3 h 00 min",
+    recommended_speed_mph: 15,
+    cafe_name: "Peacocks Tea Room",
+    cafe_hours: "Mon–Sun 9am–5pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.398,0.264",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "3 Feb", rideable: true,
+    busway_segment: true,
+    notes: "Pothole on the A10 approach near Stretham — keep right",
+    source: "Club route", date_added: "2024-02-01",
+  },
+  {
+    route_name: "St Ives Riverside",
+    type: "Road", direction: "NW",
+    distance_miles: 22.5, ascent_metres: 60,
+    estimated_time: "1 h 30 min", time_with_coffee: "2 h 00 min",
+    recommended_speed_mph: 14,
+    cafe_name: "The Bridge Café",
+    cafe_hours: "Sat–Sun 8am–3pm only",
+    cafe_maps_url: "https://maps.google.com/?q=52.33,-0.07",
+    garmin_link: "",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "", rideable: true,
+    busway_segment: true,
+    notes: "Roadworks at Fen Drayton junction until end of March",
+    source: "Roy's route", date_added: "2024-03-01",
+  },
+  {
+    route_name: "Gog Magog Gravel",
+    type: "Gravel", direction: "SE",
+    distance_miles: 31.2, ascent_metres: 310,
+    estimated_time: "2 h 20 min", time_with_coffee: "2 h 50 min",
+    recommended_speed_mph: 13,
+    cafe_name: "Gog Farm Shop Café",
+    cafe_hours: "Mon–Sun 9am–4pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.16,0.18",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "18 Jan", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Club route", date_added: "2024-03-15",
+  },
+  {
+    route_name: "Huntingdon Flat 50",
+    type: "Road", direction: "W",
+    distance_miles: 51.8, ascent_metres: 145,
+    estimated_time: "3 h 20 min", time_with_coffee: "3 h 55 min",
+    recommended_speed_mph: 15.5,
+    cafe_name: "",
+    cafe_hours: "",
+    cafe_maps_url: "",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "22 Dec", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Roy's route", date_added: "2023-12-01",
+  },
+  {
+    route_name: "Grafham Water Circuit",
+    type: "Gravel", direction: "W",
+    distance_miles: 19.8, ascent_metres: 95,
+    estimated_time: "1 h 25 min", time_with_coffee: "1 h 55 min",
+    recommended_speed_mph: 13.5,
+    cafe_name: "Grafham Visitor Centre Café",
+    cafe_hours: "Sat–Sun 10am–4pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.29,-0.29",
+    garmin_link: "",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "5 Jan", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Club route", date_added: "2024-01-05",
+  },
+  {
+    route_name: "Newmarket Heath Blast",
+    type: "Road", direction: "E",
+    distance_miles: 44.3, ascent_metres: 180,
+    estimated_time: "2 h 50 min", time_with_coffee: "3 h 25 min",
+    recommended_speed_mph: 16,
+    cafe_name: "The National Stud Café",
+    cafe_hours: "Mon–Fri 9am–3pm",
+    cafe_maps_url: "https://maps.google.com/?q=52.23,0.39",
+    garmin_link: "https://connect.garmin.com",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "12 Nov", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Roy's route", date_added: "2023-11-01",
+  },
+  {
+    route_name: "Wicken Fen Explorer",
+    type: "Gravel", direction: "NE",
+    distance_miles: 28.9, ascent_metres: 48,
+    estimated_time: "2 h 10 min", time_with_coffee: "2 h 40 min",
+    recommended_speed_mph: 13,
+    cafe_name: "Wicken Fen Visitor Centre",
+    cafe_hours: "Mon–Sun 10am–4pm (seasonal)",
+    cafe_maps_url: "https://maps.google.com/?q=52.30,0.30",
+    garmin_link: "",
+    gpx_url: "",
+    start_lat: 52.3063, start_lon: -0.0005,
+    last_ridden: "8 Feb", rideable: true,
+    busway_segment: false,
+    notes: "",
+    source: "Club route", date_added: "2024-02-08",
+  },
+];
+
+const DEMO_CAFES = [
+  { route_ref: "5 Miles from Anywhere (58)", village: "upware", cafe_name: "5 Miles from Anywhere", rating: "", notes: "", saturday_hours: "11:00", sunday_hours: "11:00", lat: 52.307786, lon: 0.252429, website: "http://www.fivemilesinn.com/" },
+  { route_ref: "Amor Cafe-Hardwick", village: "Hardwick", cafe_name: "Amor", rating: 4, notes: "", saturday_hours: "09:00", sunday_hours: "09:00", lat: 52.217456, lon: 0.01047, website: "https://amorcoffeecompany.co.uk/" },
+  { route_ref: "Ambience Cafe (50)", village: "St Neots", cafe_name: "Ambience", rating: "", notes: "", saturday_hours: "09:00", sunday_hours: "09:00", lat: 52.226005, lon: -0.274664, website: "http://www.ambiancecafe.co.uk/" },
+];
+
+/* ════════════════════════════════════════════════════════════════════
+   WEATHER — Open-Meteo API (free, no API key, CORS-enabled)
+   ════════════════════════════════════════════════════════════════════ */
+const WEATHER_CACHE_KEY = 'socc_weather_cache';
+const WEATHER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+// WMO Weather Code → icon + description mapping
+const WMO_CODES = {
+  0: { icon: '☀️', desc: 'Clear sky' },
+  1: { icon: '🌤️', desc: 'Mainly clear' },
+  2: { icon: '⛅', desc: 'Partly cloudy' },
+  3: { icon: '☁️', desc: 'Overcast' },
+  45: { icon: '🌫️', desc: 'Foggy' },
+  48: { icon: '🌫️', desc: 'Icy fog' },
+  51: { icon: '🌦️', desc: 'Light drizzle' },
+  53: { icon: '🌦️', desc: 'Drizzle' },
+  55: { icon: '🌧️', desc: 'Heavy drizzle' },
+  61: { icon: '🌧️', desc: 'Light rain' },
+  63: { icon: '🌧️', desc: 'Rain' },
+  65: { icon: '🌧️', desc: 'Heavy rain' },
+  66: { icon: '🌨️', desc: 'Freezing rain' },
+  67: { icon: '🌨️', desc: 'Heavy freezing rain' },
+  71: { icon: '🌨️', desc: 'Light snow' },
+  73: { icon: '🌨️', desc: 'Snow' },
+  75: { icon: '❄️', desc: 'Heavy snow' },
+  77: { icon: '🌨️', desc: 'Snow grains' },
+  80: { icon: '🌦️', desc: 'Light showers' },
+  81: { icon: '🌧️', desc: 'Showers' },
+  82: { icon: '⛈️', desc: 'Heavy showers' },
+  85: { icon: '🌨️', desc: 'Snow showers' },
+  86: { icon: '❄️', desc: 'Heavy snow showers' },
+  95: { icon: '⛈️', desc: 'Thunderstorm' },
+  96: { icon: '⛈️', desc: 'Thunderstorm + hail' },
+  99: { icon: '⛈️', desc: 'Thunderstorm + heavy hail' },
+};
+
+function degreesToCompass(deg) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+const DEMO_WEATHER = {
+  daily: [
+    { date: '2026-03-01', dayName: 'Sunday', tempMax: 11, tempMin: 4, windSpeed: 14, windDir: 210, windDirLabel: 'SW', rainProb: 25, weatherCode: 2, icon: '⛅', desc: 'Partly cloudy' },
+    { date: '2026-03-02', dayName: 'Monday', tempMax: 9, tempMin: 3, windSpeed: 18, windDir: 240, windDirLabel: 'WSW', rainProb: 60, weatherCode: 61, icon: '🌧️', desc: 'Light rain' },
+    { date: '2026-03-03', dayName: 'Tuesday', tempMax: 10, tempMin: 5, windSpeed: 12, windDir: 180, windDirLabel: 'S', rainProb: 35, weatherCode: 3, icon: '☁️', desc: 'Overcast' },
+    { date: '2026-03-04', dayName: 'Wednesday', tempMax: 12, tempMin: 6, windSpeed: 8, windDir: 150, windDirLabel: 'SE', rainProb: 10, weatherCode: 1, icon: '🌤️', desc: 'Mainly clear' },
+    { date: '2026-03-05', dayName: 'Thursday', tempMax: 13, tempMin: 7, windSpeed: 10, windDir: 90, windDirLabel: 'E', rainProb: 15, weatherCode: 0, icon: '☀️', desc: 'Clear sky' },
+    { date: '2026-03-06', dayName: 'Friday', tempMax: 11, tempMin: 5, windSpeed: 16, windDir: 270, windDirLabel: 'W', rainProb: 45, weatherCode: 80, icon: '🌦️', desc: 'Light showers' },
+    { date: '2026-03-07', dayName: 'Saturday', tempMax: 10, tempMin: 4, windSpeed: 20, windDir: 315, windDirLabel: 'NW', rainProb: 55, weatherCode: 63, icon: '🌧️', desc: 'Rain' },
+  ],
+  sunday: null, // set during parsing
+  lastFetched: Date.now(),
+};
+DEMO_WEATHER.sunday = DEMO_WEATHER.daily[0];
+
+async function fetchWeather() {
+  if (!CONFIG.WEATHER_ENABLED) return null;
+
+  if (CONFIG.USE_DEMO_DATA) {
+    dbg('Weather: using demo data', true);
+    return DEMO_WEATHER;
+  }
+
+  // Check cache
+  try {
+    const cached = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY));
+    if (cached && (Date.now() - cached.lastFetched < WEATHER_CACHE_TTL)) {
+      dbg(`Weather cache hit — ${Math.floor((Date.now() - cached.lastFetched) / 60000)} min old`, true);
+      return cached;
+    }
+  } catch(e) { /* ignore */ }
+
+  // Fetch from Open-Meteo
+  const lat = 52.3063, lon = -0.0004; // Swavesey
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+    + `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,weathercode`
+    + `&wind_speed_unit=mph&timezone=Europe%2FLondon&forecast_days=7`;
+
+  try {
+    dbg(`Weather: fetching from Open-Meteo...`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const daily = json.daily.time.map((dateStr, i) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      const wmo = json.daily.weathercode[i];
+      const wmoInfo = WMO_CODES[wmo] || { icon: '🌤️', desc: 'Unknown' };
+      const windDir = Math.round(json.daily.wind_direction_10m_dominant[i] || 0);
+      return {
+        date: dateStr,
+        dayName: dayNames[d.getDay()],
+        tempMax: Math.round(json.daily.temperature_2m_max[i]),
+        tempMin: Math.round(json.daily.temperature_2m_min[i]),
+        windSpeed: Math.round(json.daily.wind_speed_10m_max[i]),
+        windDir: windDir,
+        windDirLabel: degreesToCompass(windDir),
+        rainProb: Math.round(json.daily.precipitation_probability_max[i] || 0),
+        weatherCode: wmo,
+        icon: wmoInfo.icon,
+        desc: wmoInfo.desc,
+      };
+    });
+
+    // Find next Sunday (or today if it is Sunday)
+    const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+    const sunday = daily.find(d => d.dayName === rideDay) || daily[0];
+
+    const weather = { daily, sunday, lastFetched: Date.now() };
+
+    // Cache it
+    try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(weather)); } catch(e) { /* quota */ }
+    dbg(`Weather fetched — ${daily.length} days, ${rideDay}: ${sunday.icon} ${sunday.tempMax}°C, wind ${sunday.windDirLabel} ${sunday.windSpeed}mph`, true);
+    return weather;
+  } catch(e) {
+    dbg(`Weather fetch failed: ${e.message}`, false);
+    return null;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ROAD CLOSURES — TomTom Traffic Incidents API
+   Checks GPX route coordinates against nearby roadworks/closures
+   ════════════════════════════════════════════════════════════════════ */
+const CLOSURE_CACHE_KEY = 'socc_closures_cache';
+const CLOSURE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const closureCache = {}; // in-memory cache keyed by route slug
+
+/**
+ * Check road closures along a GPX route.
+ * Samples points from the GPX coordinates, queries TomTom for incidents
+ * near each sample, and returns any roadworks/closures within ~200m of the route.
+ */
+async function checkRouteClosure(gpxUrl, slug) {
+  if (!CONFIG.ROAD_CLOSURES_ENABLED || !CONFIG.TOMTOM_API_KEY) return null;
+
+  // Check in-memory cache first
+  if (closureCache[slug] && (Date.now() - closureCache[slug].ts < CLOSURE_CACHE_TTL)) {
+    return closureCache[slug].data;
+  }
+
+  try {
+    // Fetch and parse GPX to extract route coordinates
+    const resp = await fetch(gpxUrl);
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    const parser = new DOMParser();
+    const gpxDoc = parser.parseFromString(text, 'application/xml');
+
+    // Extract trackpoints
+    const trkpts = gpxDoc.querySelectorAll('trkpt');
+    if (!trkpts.length) return null;
+
+    // Sample every Nth point to keep API calls reasonable (max ~10 samples per route)
+    const step = Math.max(1, Math.floor(trkpts.length / 10));
+    const samples = [];
+    for (let i = 0; i < trkpts.length; i += step) {
+      const lat = parseFloat(trkpts[i].getAttribute('lat'));
+      const lon = parseFloat(trkpts[i].getAttribute('lon'));
+      if (!isNaN(lat) && !isNaN(lon)) samples.push({ lat, lon });
+    }
+    // Always include the last point
+    const lastPt = trkpts[trkpts.length - 1];
+    samples.push({
+      lat: parseFloat(lastPt.getAttribute('lat')),
+      lon: parseFloat(lastPt.getAttribute('lon'))
+    });
+
+    // Calculate the bounding box of the route with a ~500m buffer
+    const BUFFER = 0.005; // roughly 500m in degrees at UK latitudes
+    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    for (const s of samples) {
+      if (s.lat < minLat) minLat = s.lat;
+      if (s.lat > maxLat) maxLat = s.lat;
+      if (s.lon < minLon) minLon = s.lon;
+      if (s.lon > maxLon) maxLon = s.lon;
+    }
+    minLat -= BUFFER; maxLat += BUFFER;
+    minLon -= BUFFER; maxLon += BUFFER;
+
+    // Query TomTom Traffic Incidents API
+    // TomTom bbox format: minLon,minLat,maxLon,maxLat
+    const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
+    const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
+      + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
+      + `&bbox=${bbox}`
+      + `&fields=${encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,startTime,endTime,delay,roadNumbers,events{description}}}}')}`
+      + `&language=en-GB`
+      + `&categoryFilter=6,7,8,9`  // 6=RoadWork, 7=RoadClosure, 8=LaneClosure, 9=RoadClosedConstruction
+      + `&timeValidityFilter=present`;
+
+    const apiResp = await fetch(apiUrl);
+    if (!apiResp.ok) {
+      dbg(`TomTom API returned ${apiResp.status}`, false);
+      return null;
+    }
+    const data = await apiResp.json();
+
+    // Filter incidents that are close to the actual route (within ~200m)
+    const incidents = [];
+    if (data.incidents) {
+      for (const inc of data.incidents) {
+        const props = inc.properties || {};
+        const geom = inc.geometry || {};
+
+        // Check if any incident coordinate is near any route sample point
+        const incCoords = geom.coordinates || [];
+        let nearRoute = false;
+        for (const coord of incCoords) {
+          // coord = [lon, lat] in GeoJSON format
+          const incLon = Array.isArray(coord[0]) ? coord[0][0] : coord[0];
+          const incLat = Array.isArray(coord[0]) ? coord[0][1] : coord[1];
+          for (const s of samples) {
+            const dLat = Math.abs(incLat - s.lat);
+            const dLon = Math.abs(incLon - s.lon);
+            // ~200m threshold (approx 0.002 degrees at UK latitude)
+            if (dLat < 0.002 && dLon < 0.003) {
+              nearRoute = true;
+              break;
+            }
+          }
+          if (nearRoute) break;
+        }
+
+        if (nearRoute) {
+          const cat = props.iconCategory;
+          const isRoadwork = cat === 6 || cat === 9;
+          const isClosure = cat === 7 || cat === 8;
+          // Description is inside events array
+          const desc = (props.events && props.events[0] && props.events[0].description) || 'Road incident';
+          incidents.push({
+            type: isClosure ? 'closure' : isRoadwork ? 'roadwork' : 'incident',
+            description: escHtml(desc),
+            from: escHtml(props.from || ''),
+            to: escHtml(props.to || ''),
+            startTime: props.startTime || null,
+            endTime: props.endTime || null,
+            roads: (props.roadNumbers || []).map(r => escHtml(r)).join(', '),
+          });
+        }
+      }
+    }
+
+    const result = {
+      closures: incidents.filter(i => i.type === 'closure'),
+      roadworks: incidents.filter(i => i.type === 'roadwork'),
+      total: incidents.length,
+      checked: new Date().toISOString()
+    };
+
+    // Cache result
+    closureCache[slug] = { data: result, ts: Date.now() };
+    return result;
+  } catch (e) {
+    dbg(`Road closure check failed: ${e.message}`, false);
+    return null;
+  }
+}
+
+/** Format a closure result for display in a card */
+function renderClosureHtml(closureData) {
+  if (!closureData) return '';
+
+  if (closureData.total === 0) {
+    return `<div class="card-closure-row clear">
+      <span class="closure-icon">✅</span>
+      <div class="closure-details">No road closures or roadworks detected on this route</div>
+    </div>`;
+  }
+
+  const items = [];
+  for (const c of closureData.closures) {
+    let dates = '';
+    if (c.startTime || c.endTime) {
+      const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short'}); } catch(e) { return ''; } };
+      const start = c.startTime ? fmt(c.startTime) : '';
+      const end = c.endTime ? fmt(c.endTime) : '';
+      dates = start && end ? ` (${start} – ${end})` : start ? ` (from ${start})` : end ? ` (until ${end})` : '';
+    }
+    items.push(`<div class="closure-item">
+      <span class="closure-desc">🚫 ${c.description}</span>
+      ${c.from || c.to ? `<br><span class="closure-dates">${c.from}${c.to ? ' → ' + c.to : ''}${dates}</span>` : dates ? `<br><span class="closure-dates">${dates}</span>` : ''}
+    </div>`);
+  }
+  for (const r of closureData.roadworks) {
+    let dates = '';
+    if (r.startTime || r.endTime) {
+      const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short'}); } catch(e) { return ''; } };
+      const start = r.startTime ? fmt(r.startTime) : '';
+      const end = r.endTime ? fmt(r.endTime) : '';
+      dates = start && end ? ` (${start} – ${end})` : start ? ` (from ${start})` : end ? ` (until ${end})` : '';
+    }
+    items.push(`<div class="closure-item">
+      <span class="closure-desc">🚧 ${r.description}</span>
+      ${r.from || r.to ? `<br><span class="closure-dates">${r.from}${r.to ? ' → ' + r.to : ''}${dates}</span>` : dates ? `<br><span class="closure-dates">${dates}</span>` : ''}
+    </div>`);
+  }
+
+  const icon = closureData.closures.length > 0 ? '⚠️' : '🚧';
+  const label = closureData.closures.length > 0 ? 'Road closure' : 'Roadworks';
+  return `<div class="card-closure-row">
+    <span class="closure-icon">${icon}</span>
+    <div class="closure-details">${items.join('')}</div>
+  </div>`;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════════════ */
+let allRoutes = [];
+let filteredRoutes = [];
+let allCafes = [];
+let weatherData = null;  // populated by fetchWeather()
+let openMaps = {};   // cardId → leaflet map instance
+let filterTimer = null;
+
+const state = {
+  type: 'all',
+  distMin: 0, distMax: 160,
+  ascentMin: 0, ascentMax: 2500,
+  directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
+  mapDisplay: 'all',  // 'routes' | 'all' | 'cafes'
+  excludeBusway: false,
+  closureMode: 'closures',  // 'off' | 'closures' | 'all'
+  sort: 'name',
+  targetDistance: CONFIG.TARGET_DISTANCE,  // for ride planner
+  selectedDayIdx: null,  // index into weatherData.daily (null = default ride day)
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   DATA FETCHING — with localStorage cache (1 hour TTL)
+   ════════════════════════════════════════════════════════════════════ */
+const CACHE_KEY = 'socc_routes_cache';
+const CAFES_CACHE_KEY = 'socc_cafes_cache';
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
+
+function dbg(msg, ok) {
+  if (!CONFIG.SHOW_DEBUG) return;
+  console.log('SOCC DEBUG:', msg);
+  const log = document.getElementById('debugLog');
+  if (!log) return;
+  const row = document.createElement('div');
+  row.style.cssText = `padding:0.3rem 0.5rem;border-radius:4px;background:${ok === false ? 'rgba(224,54,54,0.2)' : ok === true ? 'rgba(29,184,122,0.15)' : 'rgba(255,255,255,0.05)'}`;
+  row.innerHTML = `<span style="color:${ok === false ? '#f87171' : ok === true ? '#4ade80' : '#93c5fd'}">${ok === false ? '✗' : ok === true ? '✓' : '→'}</span> ${msg}`;
+  log.appendChild(row);
+}
+
+async function fetchRoutes() {
+  dbg(`CONFIG.USE_DEMO_DATA = ${CONFIG.USE_DEMO_DATA}`);
+  dbg(`CONFIG.SHEET_ID = ${CONFIG.SHEET_ID.slice(0,20)}...`);
+  dbg(`CONFIG.SHEET_GID = ${CONFIG.SHEET_GID}`);
+
+  if (CONFIG.USE_DEMO_DATA) {
+    const demo = DEMO_ROUTES.filter(r => r.rideable !== false);
+    dbg(`Demo mode — returning ${demo.length} routes`, true);
+    return demo;
+  }
+
+  // Return cached data if still fresh
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      const ageMins = Math.floor((Date.now() - cached.timestamp) / 60000);
+      dbg(`Cache hit — ${cached.data.length} routes, ${ageMins} min old`, true);
+      showCacheAge(cached.timestamp);
+      return cached.data;
+    } else if (cached) {
+      dbg(`Cache expired — fetching fresh`);
+    } else {
+      dbg(`No cache found — fetching fresh`);
+    }
+  } catch(e) {
+    dbg(`Cache read error: ${e.message}`, false);
+  }
+
+  // Fetch fresh from sheet
+  const url = `https://docs.google.com/spreadsheets/d/e/${CONFIG.SHEET_ID}/pub?gid=${CONFIG.SHEET_GID}&single=true&output=csv`;
+  dbg(`Fetching: ${url.slice(0,80)}...`);
+
+  let res;
+  try {
+    res = await fetch(url);
+    dbg(`HTTP status: ${res.status} ${res.statusText}`, res.ok);
+  } catch(e) {
+    if (location.protocol === 'file:') {
+      dbg('✗ Running as file:// — browsers block fetch() from local files. Serve via http:// instead:', false);
+      dbg('  → Option A: run  npx serve .  then open http://localhost:3000', false);
+      dbg('  → Option B: run  python3 -m http.server 8080  then open http://localhost:8080', false);
+      dbg('  → Option C: VS Code → right-click index.html → Open with Live Server', false);
+      dbg('  → Or just deploy to Netlify — it will work fine there', false);
+    } else {
+      dbg(`Fetch failed (network/CORS): ${e.message}`, false);
+    }
+    throw e;
+  }
+
+  let csv;
+  try {
+    csv = await res.text();
+    dbg(`Response length: ${csv.length} chars`);
+    dbg(`First 120 chars: ${csv.slice(0,120).replace(/\n/g,' ')}`);
+  } catch(e) {
+    dbg(`Failed to read response text: ${e.message}`, false);
+    throw e;
+  }
+
+  if (csv.length < 10) {
+    dbg('Response is empty — sheet may not be published correctly', false);
+    throw new Error('Empty CSV response');
+  }
+  if (csv.toLowerCase().includes('<html')) {
+    dbg('Response is HTML not CSV — likely a Google sign-in redirect', false);
+    throw new Error('Got HTML instead of CSV');
+  }
+
+  let parsed;
+  try {
+    parsed = parseCSV(csv);
+    dbg(`CSV parsed — ${parsed.length} total rows`);
+    if (parsed.length > 0) {
+      dbg(`Columns detected: ${Object.keys(parsed[0]).join(', ')}`);
+    }
+  } catch(e) {
+    dbg(`CSV parse error: ${e.message}`, false);
+    throw e;
+  }
+
+  // Check rideable column
+  const rideableVals = [...new Set(parsed.map(r => String(r.rideable)))];
+  dbg(`'rideable' values found: ${rideableVals.join(', ')}`);
+
+  const data = parsed.filter(r => {
+    const rv = String(r.rideable || '').toLowerCase().trim();
+    // Hide only if explicitly marked NO/false, or pending (?check cafe, argh, etc.)
+    if (r.rideable === false) return false;  // explicit NO
+    if (rv === '?check cafe') return false;
+    if (rv !== '' && rv !== 'true' && rv !== 'yes' && rv !== 'road' && rv !== 'mtb') return false;
+    return true;
+  });
+  dbg(`Rideable routes: ${data.length} of ${parsed.length}`, data.length > 0);
+
+  if (data.length === 0 && parsed.length > 0) {
+    dbg("⚠️ All routes filtered out — 'rideable' column must be YES/TRUE/true. Found: " + rideableVals.join(', '), false);
+  } else if (data.length < parsed.length) {
+    const excluded = parsed.length - data.length;
+    dbg(`ℹ️ ${excluded} rows excluded — rideable is NO/FALSE/empty/?Check cafe etc`);
+  }
+
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
+    dbg(`Cached ${data.length} routes to localStorage`, true);
+  } catch(e) {
+    dbg(`Cache write failed (storage full?): ${e.message}`, false);
+  }
+
+  showCacheAge(Date.now());
+  return data;
+}
+
+async function fetchCafes() {
+  if (CONFIG.USE_DEMO_DATA) {
+    dbg(`Demo mode — returning ${DEMO_CAFES.length} cafes`, true);
+    return DEMO_CAFES;
+  }
+
+  // Return cached data if still fresh
+  try {
+    const cached = JSON.parse(localStorage.getItem(CAFES_CACHE_KEY));
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      dbg(`Cafes cache hit — ${cached.data.length} cafes`, true);
+      return cached.data;
+    }
+  } catch(e) { /* ignore */ }
+
+  const url = `https://docs.google.com/spreadsheets/d/e/${CONFIG.SHEET_ID}/pub?gid=${CONFIG.CAFES_GID}&single=true&output=csv`;
+  dbg(`Fetching cafes: ${url.slice(0,80)}...`);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const csv = await res.text();
+    if (csv.length < 10 || csv.toLowerCase().includes('<html')) {
+      throw new Error('Invalid CSV response for cafes');
+    }
+    const parsed = parseCSV(csv, CONFIG.CAFE_COLUMN_MAP);
+    // Only keep cafes with valid coordinates
+    const data = parsed.filter(c => {
+      const lat = parseFloat(c.lat);
+      const lon = parseFloat(c.lon);
+      return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+    });
+    dbg(`Cafes parsed — ${parsed.length} total, ${data.length} with coordinates`, data.length > 0);
+
+    try {
+      localStorage.setItem(CAFES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
+    } catch(e) { /* storage full — non-fatal */ }
+
+    return data;
+  } catch(e) {
+    dbg(`Cafes fetch failed: ${e.message}`, false);
+    return []; // non-fatal — app works without cafes
+  }
+}
+
+function clearCache() {
+  localStorage.removeItem(CACHE_KEY);
+  localStorage.removeItem(CAFES_CACHE_KEY);
+  location.reload();
+}
+
+function showCacheAge(timestamp) {
+  const el = document.getElementById('cacheAge');
+  if (!el) return;
+  const mins = Math.floor((Date.now() - timestamp) / 60000);
+  el.textContent = mins < 1 ? 'Data: just refreshed' : `Data: ${mins} min${mins > 1 ? 's' : ''} ago`;
+}
+
+function parseCSV(csv, columnMap) {
+  const colMap = columnMap || CONFIG.COLUMN_MAP;
+  const lines = csv.trim().split('\n');
+  const rawHeaders = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+
+  // Normalise headers using column map (case-insensitive lookup)
+  const headers = rawHeaders.map(h => {
+    const key = h.toLowerCase();
+    return colMap[key] || h; // mapped name, or original if not in map
+  });
+
+  return lines.slice(1).map(line => {
+    const vals = smartSplit(line);
+    const obj = {};
+    headers.forEach((h, i) => {
+      if (!h) return; // skip empty column headers
+      let v = (vals[i] || '').replace(/^"|"$/g, '').trim();
+      const vl = v.toLowerCase();
+      if (vl === 'true' || vl === 'yes' || v === '1') v = true;
+      else if (vl === 'false' || vl === 'no' || v === '0') v = false;
+      // blank stays as '' — handled in rideable filter (blank = show)
+      else if (!isNaN(v) && v !== '') v = parseFloat(v);
+      obj[h] = v;
+    });
+    // Normalise busway_segment: YES/yes → true, n/no/blank → false
+    if ('busway_segment' in obj) {
+      const bv = String(obj.busway_segment).toLowerCase().trim();
+      obj.busway_segment = (bv === 'yes' || bv === 'true' || bv === '1');
+    }
+    // Convert decimal-hours Time field to "X h YY min" string
+    if (obj.estimated_time_raw !== undefined && obj.estimated_time_raw !== '') {
+      const dh = parseFloat(obj.estimated_time_raw);
+      if (!isNaN(dh)) {
+        const h = Math.floor(dh);
+        const m = Math.round((dh - h) * 60);
+        obj.estimated_time = m > 0 ? `${h} h ${m} min` : `${h} h`;
+      }
+    }
+    return obj;
+  });
+}
+
+function smartSplit(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FILTERING & SORTING
+   ════════════════════════════════════════════════════════════════════ */
+function applyFilters() {
+  // DEBUG: log first route's raw values so we can see what fields look like
+  if (allRoutes.length > 0) {
+    const r0 = allRoutes[0];
+    dbg(`First route: "${r0.route_name}" | type:"${r0.type}" | dir:"${r0.direction}" | dist:${r0.distance_miles}`);
+    const dirVals = [...new Set(allRoutes.map(r => String(r.direction || '')))];
+    dbg(`All direction values in data: ${dirVals.join(', ')}`);
+  }
+
+  filteredRoutes = allRoutes.filter(r => {
+    // type — skip check if sheet has no type column (undefined = show all)
+    if (state.type !== 'all' && r.type && r.type !== state.type) return false;
+
+    // distance
+    const d = parseFloat(r.distance_miles) || 0;
+    if (d < state.distMin || d > state.distMax) return false;
+
+    // ascent
+    const a = parseFloat(r.ascent_metres) || 0;
+    if (a < state.ascentMin || a > state.ascentMax) return false;
+
+    // direction — normalise before matching, blank = pass through
+    const dir = normaliseDir(r.direction);
+    if (dir && !state.directions.has(dir)) return false;
+
+    // café display is handled by mapDisplay toggle in refreshMasterMap (separate Cafes dataset)
+
+    // busway
+    if (state.excludeBusway && r.busway_segment === true) return false;
+
+    return true;
+  });
+
+  dbg(`After filters: ${filteredRoutes.length} of ${allRoutes.length} routes visible`);
+  refreshMasterMap(); // keep master map in sync with filters
+
+  filteredRoutes.sort((a, b) => {
+    if (state.sort === 'fmr_score')  return (b.fmrScore||0) - (a.fmrScore||0);
+    if (state.sort === 'name')       return safe(a.route_name).localeCompare(safe(b.route_name));
+    if (state.sort === 'dist_asc')   return (a.distance_miles||0) - (b.distance_miles||0);
+    if (state.sort === 'dist_desc')  return (b.distance_miles||0) - (a.distance_miles||0);
+    if (state.sort === 'ascent')     return (a.ascent_metres||0) - (b.ascent_metres||0);
+    if (state.sort === 'last_ridden') return (b.last_ridden||'').localeCompare(a.last_ridden||'');
+    return 0;
+  });
+
+  renderCards();
+  updateCounts();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════ */
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function distBadgeClass(mi) {
+  if (mi < 25) return 'badge-dist-green';
+  if (mi <= 40) return 'badge-dist-amber';
+  return 'badge-dist-red';
+}
+
+function dirBadgeClass(dir) {
+  return `badge-dir-${dir}`;
+}
+
+function hasRoadwork(notes) {
+  return notes && /pothole|roadworks/i.test(notes);
+}
+
+function escHtml(s) {
+  if (s === null || s === undefined || s === false) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// safe(): always returns a trimmed string, never undefined/null/number issues
+function safe(v) {
+  if (v === null || v === undefined || v === false || v === true) return '';
+  return String(v).trim();
+}
+
+// safeNum(): returns a number or 0
+function safeNum(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+// normaliseDir(): uppercase + trim, maps compound like "s/sw" -> "S"
+function normaliseDir(d) {
+  const s = safe(d).toUpperCase().replace(/\s/g,'');
+  // Handle compound directions like S/SW, N/NE — take the first part
+  if (s.includes('/')) return s.split('/')[0];
+  return s;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   WEATHER RENDERING
+   ════════════════════════════════════════════════════════════════════ */
+function renderWeatherStrip(weather) {
+  const strip = document.getElementById('weatherStrip');
+  if (!strip) return;
+
+  if (!weather || !weather.daily || weather.daily.length === 0) {
+    strip.innerHTML = '<div class="weather-loading">Weather unavailable</div>';
+    return;
+  }
+
+  const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+  // Default selected day is the ride day (Sunday)
+  const selectedIdx = weather.daily.findIndex(d => d.dayName === rideDay);
+
+  strip.innerHTML = weather.daily.map((day, idx) => {
+    const isSunday = day.dayName === rideDay;
+    const isSelected = idx === selectedIdx;
+    const windRotation = day.windDir;
+    return `<div class="weather-day${isSunday ? ' sunday-highlight' : ''}${isSelected ? ' day-selected' : ''}"
+      data-day-idx="${idx}" title="${escHtml(day.desc)} — click to plan rides for this day" role="button" tabindex="0">
+      <div class="weather-day-name">${isSunday ? '&#9733; ' : ''}${escHtml(day.dayName.slice(0, 3))}</div>
+      <div class="weather-day-icon">${day.icon}</div>
+      <div class="weather-day-temp">${day.tempMax}° <span>${day.tempMin}°</span></div>
+      <div class="weather-day-wind">
+        <span class="wind-arrow" style="transform:rotate(${windRotation}deg)">↓</span>
+        ${escHtml(day.windDirLabel)} ${day.windSpeed}
+      </div>
+      <div class="weather-day-rain">${day.rainProb > 0 ? '💧 ' + day.rainProb + '%' : '&nbsp;'}</div>
+    </div>`;
+  }).join('');
+
+  // Bind click events on weather days
+  strip.querySelectorAll('.weather-day').forEach(el => {
+    el.addEventListener('click', function() {
+      const idx = parseInt(this.dataset.dayIdx, 10);
+      selectPlannerDay(idx);
+    });
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+    });
+  });
+}
+
+function selectPlannerDay(dayIdx) {
+  if (!weatherData || !weatherData.daily || !weatherData.daily[dayIdx]) return;
+  const selectedDay = weatherData.daily[dayIdx];
+  state.selectedDayIdx = dayIdx;
+
+  // Update the selected highlight on weather strip
+  document.querySelectorAll('.weather-day').forEach((el, i) => {
+    el.classList.toggle('day-selected', i === dayIdx);
+  });
+
+  // Re-render the planner for the selected day
+  renderRidePlannerForDay(selectedDay);
+
+  // Re-render route cards so their weather rows reflect the newly selected day
+  if (typeof renderCards === 'function') renderCards();
+}
+
+function renderRidePlannerForDay(dayData) {
+  const heading = document.getElementById('plannerHeading');
+  const advice = document.getElementById('plannerAdvice');
+  const picksContainer = document.getElementById('plannerPicks');
+  const weatherCard = document.getElementById('plannerWeatherCard');
+
+  if (heading) heading.textContent = `This ${dayData.dayName}'s Ride`;
+
+  // Update picks title
+  const picksTitle = document.getElementById('plannerPicksTitle');
+  if (picksTitle) picksTitle.textContent = `Top picks for ${dayData.dayName}`;
+
+  const windFromLabel = dayData.windDirLabel;
+  const optimalOutbound = degreesToCompass(dayData.windDir);
+  if (advice) {
+    advice.innerHTML = `Wind from the <strong>${escHtml(windFromLabel)}</strong> at <strong>${dayData.windSpeed} mph</strong> — `
+      + `head <strong>${escHtml(optimalOutbound)}</strong> outbound for a tailwind home.`;
+  }
+
+  if (weatherCard) {
+    weatherCard.innerHTML = `
+      <div class="planner-weather-day">${escHtml(dayData.dayName)}</div>
+      <div class="planner-weather-date">${formatDateNice(dayData.date)}</div>
+      <div class="planner-weather-icon">${dayData.icon}</div>
+      <div class="planner-weather-desc">${escHtml(dayData.desc)}</div>
+      <div class="planner-weather-stats">
+        <div>
+          <div class="planner-weather-stat-val">${dayData.tempMax}°<span style="font-size:0.7rem;color:rgba(255,255,255,0.4)">/${dayData.tempMin}°</span></div>
+          <div class="planner-weather-stat-label">Temperature</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val">${dayData.windSpeed}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)"> mph</span></div>
+          <div class="planner-weather-stat-label">Wind ${escHtml(windFromLabel)}</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val">${dayData.rainProb}<span style="font-size:0.65rem;color:rgba(255,255,255,0.4)">%</span></div>
+          <div class="planner-weather-stat-label">Rain chance</div>
+        </div>
+        <div>
+          <div class="planner-weather-stat-val" style="font-size:0.85rem">${escHtml(dayData.desc)}</div>
+          <div class="planner-weather-stat-label">Outlook</div>
+        </div>
+      </div>
+      <div class="wind-compass-wrap" title="Wind from ${escHtml(windFromLabel)}">
+        ${buildWindCompassSVG(dayData.windDir)}
+      </div>
+    `;
+  }
+
+  const targetDist = state.targetDistance || 40;
+  const scored = scoreSundayRoutes(allRoutes, weatherData, targetDist, dayData);
+  renderPickCards(scored.slice(0, 3), picksContainer);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RIDE PLANNER — Scoring & Rendering
+   ════════════════════════════════════════════════════════════════════ */
+const DIR_TO_BEARING = { N:0, NE:45, E:90, SE:135, S:180, SW:225, W:270, NW:315 };
+
+/* Return the selected day's weather object, or default ride day (Sunday) */
+function getSelectedDayWeather() {
+  if (!weatherData || !weatherData.daily) return null;
+  if (state.selectedDayIdx != null && weatherData.daily[state.selectedDayIdx]) {
+    return weatherData.daily[state.selectedDayIdx];
+  }
+  return weatherData.sunday || null;
+}
+
+function windAlignmentScore(routeDir, sundayWeather) {
+  if (!sundayWeather) return 0;
+  const routeBearing = DIR_TO_BEARING[normaliseDir(routeDir)] ?? 180;
+  const windFrom = sundayWeather.windDir; // degrees wind is coming FROM
+  // Tailwind home = outbound direction matches where wind comes from
+  // (ride INTO wind outbound, wind pushes you home on return)
+  let angleDiff = Math.abs(routeBearing - windFrom);
+  if (angleDiff > 180) angleDiff = 360 - angleDiff;
+  return Math.cos(angleDiff * Math.PI / 180); // 1.0 = perfect tailwind home, -1.0 = headwind home
+}
+
+function windLabel(score) {
+  if (score > 0.7)  return { text: 'Tailwind home',     cls: 'pick-wind-tail' };
+  if (score > 0.25) return { text: 'Mostly favourable', cls: 'pick-wind-favour' };
+  if (score > -0.25) return { text: 'Crosswind',        cls: 'pick-wind-cross' };
+  return                     { text: 'Headwind home',    cls: 'pick-wind-head' };
+}
+
+function scoreSundayRoutes(routes, weather, targetDist, dayWeather) {
+  const day = dayWeather || (weather && weather.sunday);
+  if (!day) return routes.filter(r => (safe(r.type)||'Road').toLowerCase() === 'road').slice(0, 3);
+
+  // Only score Road rides for the planner, respecting busway toggle
+  const roadRoutes = routes.filter(r => {
+    if ((safe(r.type)||'Road').toLowerCase() !== 'road') return false;
+    if (state.excludeBusway && r.busway_segment === true) return false;
+    return true;
+  });
+
+  return roadRoutes.map(route => {
+    const dist = safeNum(route.distance_miles);
+    const dir = normaliseDir(route.direction);
+
+    // Wind alignment (45% weight)
+    const ws = windAlignmentScore(dir, day);
+
+    // Distance match — gaussian around target (35% weight)
+    const distDiff = Math.abs(dist - targetDist);
+    const distScore = Math.max(0, 1 - distDiff / 40);
+
+    // Café bonus (10% weight)
+    const hasCafe = !!(route.cafe_name || '').trim();
+    const cafeScore = hasCafe ? 1 : 0;
+
+    // Recency — prefer routes not recently ridden (10% weight)
+    const lr = safe(route.last_ridden).toLowerCase().trim();
+    const recencyScore = lr === '' ? 0.8 : 0.5; // unridden gets slight boost
+
+    const total = (ws * 0.45) + (distScore * 0.35) + (cafeScore * 0.10) + (recencyScore * 0.10);
+    const matchPct = Math.round(Math.max(0, Math.min(100, (total + 1) / 2 * 100)));
+    const wl = windLabel(ws);
+
+    return { ...route, matchPct, windScore: ws, windLabelText: wl.text, windLabelCls: wl.cls };
+  }).sort((a, b) => b.matchPct - a.matchPct);
+}
+
+function formatDateNice(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch(e) { return dateStr; }
+}
+
+function buildWindCompassSVG(windDir) {
+  // Arrow points in the direction wind is blowing TO
+  const rotation = (windDir + 180) % 360;
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(44,188,179,0.3)" stroke-width="2" stroke-dasharray="8 4"/>
+    <text x="50" y="14" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">N</text>
+    <text x="50" y="96" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">S</text>
+    <text x="8" y="54" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">W</text>
+    <text x="92" y="54" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle" font-weight="700">E</text>
+    <g transform="rotate(${rotation} 50 50)">
+      <line x1="50" y1="18" x2="50" y2="70" stroke="#2CBCB3" stroke-width="3" stroke-linecap="round"/>
+      <polygon points="50,16 44,28 56,28" fill="#2CBCB3"/>
+    </g>
+  </svg>`;
+}
+
+function adjustPlannerDist(delta) {
+  const slider = document.getElementById('plannerDist');
+  if (!slider) return;
+  const newVal = Math.min(Math.max(parseInt(slider.min), parseInt(slider.value) + delta), parseInt(slider.max));
+  slider.value = newVal;
+  slider.dispatchEvent(new Event('input')); // trigger the 'input' handler to refresh picks
+}
+
+function adjustRange(id, delta) {
+  const slider = document.getElementById(id);
+  if (!slider) return;
+  const newVal = Math.min(Math.max(parseInt(slider.min), parseInt(slider.value) + delta), parseInt(slider.max));
+  slider.value = newVal;
+  slider.dispatchEvent(new Event('input'));
+}
+
+function renderRidePlanner(weather, routes) {
+  const advice = document.getElementById('plannerAdvice');
+  const picksContainer = document.getElementById('plannerPicks');
+  const weatherCard = document.getElementById('plannerWeatherCard');
+  const plannerDistSlider = document.getElementById('plannerDist');
+
+  if (!weather || !weather.sunday) {
+    if (advice) advice.textContent = 'Weather data unavailable — showing routes by distance match only.';
+    if (weatherCard) weatherCard.innerHTML = '<div class="planner-no-weather">Weather unavailable</div>';
+    // Still show top picks by distance (road only, respecting busway toggle)
+    const targetDist = state.targetDistance || 40;
+    const roadRoutes = routes.filter(r => {
+      if ((safe(r.type)||'Road').toLowerCase() !== 'road') return false;
+      if (state.excludeBusway && r.busway_segment === true) return false;
+      return true;
+    });
+    const sorted = roadRoutes.slice().sort((a, b) => {
+      return Math.abs(safeNum(a.distance_miles) - targetDist) - Math.abs(safeNum(b.distance_miles) - targetDist);
+    }).slice(0, 3);
+    renderPickCards(sorted, picksContainer);
+    return;
+  }
+
+  // Default to the ride day (Sunday) and set selectedDayIdx
+  const rideDay = CONFIG.DEFAULT_RIDE_DAY.charAt(0).toUpperCase() + CONFIG.DEFAULT_RIDE_DAY.slice(1);
+  if (state.selectedDayIdx == null) {
+    state.selectedDayIdx = weather.daily.findIndex(d => d.dayName === rideDay);
+    if (state.selectedDayIdx < 0) state.selectedDayIdx = 0;
+  }
+
+  // Render the initial day
+  renderRidePlannerForDay(weather.daily[state.selectedDayIdx]);
+
+  // Bind slider events (once)
+  if (plannerDistSlider && !plannerDistSlider._bound) {
+    plannerDistSlider._bound = true;
+    plannerDistSlider.addEventListener('input', function() {
+      state.targetDistance = parseInt(this.value, 10);
+      const valEl = document.getElementById('plannerDistVal');
+      if (valEl) valEl.textContent = state.targetDistance + ' mi';
+      
+      savePrefs(); // PERSIST CHANGE
+      
+      // Re-score using the currently selected day
+      const dayWeather = getSelectedDayWeather();
+      const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance, dayWeather);
+      renderPickCards(scored2.slice(0, 3), document.getElementById('plannerPicks'));
+    });
+  }
+}
+
+function renderPickCards(picks, container) {
+  if (!container) return;
+  if (!picks || picks.length === 0) {
+    container.innerHTML = '<div class="planner-no-weather">No routes match your criteria</div>';
+    return;
+  }
+
+  container.innerHTML = picks.map(route => {
+    const slug = slugify(route.route_name);
+    const dist = safeNum(route.distance_miles);
+    const dir = normaliseDir(route.direction);
+    const cafe = safe(route.cafe_name);
+    const matchPct = route.matchPct || 0;
+    const windCls = route.windLabelCls || 'pick-wind-cross';
+    const windText = route.windLabelText || 'Unknown';
+
+    return `<div class="pick-card" onclick="window.scrollToCard('${slug}')">
+      <div class="pick-card-match">${matchPct}% match</div>
+      <div class="pick-card-name">${escHtml(safe(route.route_name))}</div>
+      <div class="pick-card-meta">
+        <span>${dist} mi</span>
+        <span>${escHtml(dir)}</span>
+        <span>${escHtml(safe(route.type))}</span>
+      </div>
+      <div class="pick-card-wind ${windCls}">${escHtml(windText)}</div>
+      ${cafe ? `<div class="pick-card-cafe">☕ ${escHtml(cafe)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FIND MY RIDE — Smart Scoring Engine
+   ════════════════════════════════════════════════════════════════════ */
+function initFindMyRide() {
+  const toggle = document.getElementById('findRideToggle');
+  const panel = document.getElementById('findMyRide');
+  const distSlider = document.getElementById('fmrDist');
+  const distVal = document.getElementById('fmrDistVal');
+  const timeSlider = document.getElementById('fmrTime');
+  const timeVal = document.getElementById('fmrTimeVal');
+  const searchBtn = document.getElementById('fmrSearch');
+  const resetBtn = document.getElementById('fmrReset');
+  const resultMsg = document.getElementById('fmrResultMsg');
+
+  if (!toggle || !panel) return;
+
+  // Toggle open/close
+  toggle.addEventListener('click', () => {
+    panel.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', panel.classList.contains('open'));
+  });
+
+  // Slider updates
+  distSlider.addEventListener('input', () => {
+    distVal.textContent = distSlider.value + ' mi';
+  });
+  timeSlider.addEventListener('input', () => {
+    const v = parseFloat(timeSlider.value);
+    timeVal.textContent = v === 1 ? '1 hr' : v % 1 === 0 ? v + ' hrs' : v + ' hrs';
+  });
+
+  // Option button groups
+  document.querySelectorAll('.find-ride-options').forEach(group => {
+    group.querySelectorAll('.find-ride-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.find-ride-opt').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-checked', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-checked', 'true');
+      });
+    });
+  });
+
+  // Search action
+  searchBtn.addEventListener('click', () => {
+    const prefs = getFindMyRidePrefs();
+    applyFindMyRide(prefs);
+  });
+
+  // Reset
+  resetBtn.addEventListener('click', () => {
+    distSlider.value = 40;
+    distVal.textContent = '40 mi';
+    timeSlider.value = 3;
+    timeVal.textContent = '3 hrs';
+    // Reset all option groups to first option
+    document.querySelectorAll('.find-ride-options').forEach(group => {
+      group.querySelectorAll('.find-ride-opt').forEach((btn, i) => {
+        btn.classList.toggle('active', i === 0 || (group.id === 'fmrDifficulty' && btn.dataset.val === 'moderate'));
+        btn.setAttribute('aria-checked', btn.classList.contains('active'));
+      });
+    });
+    // Reset difficulty specifically to "moderate"
+    const diffGroup = document.getElementById('fmrDifficulty');
+    if (diffGroup) {
+      diffGroup.querySelectorAll('.find-ride-opt').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === 'moderate');
+        b.setAttribute('aria-checked', b.dataset.val === 'moderate' ? 'true' : 'false');
+      });
+    }
+    resultMsg.textContent = '';
+    // Re-sort to default
+    state.sort = 'name';
+    const sortSel = document.getElementById('sortSelect');
+    if (sortSel) sortSel.value = 'name';
+    applyFilters();
+  });
+}
+
+function getFindMyRidePrefs() {
+  return {
+    distance: parseInt(document.getElementById('fmrDist').value) || 40,
+    timeHours: parseFloat(document.getElementById('fmrTime').value) || 3,
+    cafe: getActiveVal('fmrCafe') || 'any',
+    difficulty: getActiveVal('fmrDifficulty') || 'moderate',
+    type: getActiveVal('fmrType') || 'any',
+    busway: getActiveVal('fmrBusway') || 'any',
+  };
+}
+
+function getActiveVal(groupId) {
+  const group = document.getElementById(groupId);
+  if (!group) return null;
+  const active = group.querySelector('.find-ride-opt.active');
+  return active ? active.dataset.val : null;
+}
+
+function scoreRouteForPrefs(route, prefs) {
+  const dist = parseFloat(route.distance_miles) || 0;
+  const ascent = parseFloat(route.ascent_metres) || 0;
+  const hasCafe = !!(route.cafe_name || '').trim();
+  const routeType = (safe(route.type) || 'Road').trim();
+  const isBusway = (route.busway_segment === true || route.busway_segment === 'TRUE');
+  const lr = safe(route.last_ridden).toLowerCase().trim();
+
+  let score = 0;
+
+  // 1. Distance fit (25% weight) — gaussian around target
+  const distDiff = Math.abs(dist - prefs.distance);
+  const distScore = Math.exp(-(distDiff * distDiff) / (2 * 15 * 15)); // σ = 15
+  score += 0.25 * distScore;
+
+  // 2. Wind alignment (25% weight, if weather available)
+  let windScore = 0.5; // neutral default
+  const selectedDayFmr = getSelectedDayWeather();
+  if (selectedDayFmr) {
+    const dir = normaliseDir(route.direction);
+    const ws = windAlignmentScore(dir, selectedDayFmr);
+    windScore = (ws + 1) / 2; // normalise from [-1,1] to [0,1]
+  }
+  score += 0.25 * windScore;
+
+  // 3. Café match (15% weight)
+  if (prefs.cafe === 'yes') {
+    score += 0.15 * (hasCafe ? 1 : 0);
+  } else if (prefs.cafe === 'no') {
+    score += 0.15 * (hasCafe ? 0.3 : 1); // slight penalty for café routes
+  } else {
+    score += 0.15 * 0.8; // "any" — mild positive
+  }
+
+  // 4. Difficulty/ascent match (15% weight)
+  let ascentTarget, ascentSigma;
+  if (prefs.difficulty === 'easy') {
+    ascentTarget = 100; ascentSigma = 80;
+  } else if (prefs.difficulty === 'hard') {
+    ascentTarget = 500; ascentSigma = 200;
+  } else {
+    ascentTarget = 250; ascentSigma = 120;
+  }
+  const ascentDiff = Math.abs(ascent - ascentTarget);
+  const ascentScore = Math.exp(-(ascentDiff * ascentDiff) / (2 * ascentSigma * ascentSigma));
+  score += 0.15 * ascentScore;
+
+  // 5. Time fit (10% weight) — estimate ride time from distance at ~15mph avg
+  const estHours = dist / 15;
+  const timeDiff = Math.abs(estHours - prefs.timeHours);
+  const timeScore = Math.exp(-(timeDiff * timeDiff) / (2 * 1.2 * 1.2));
+  score += 0.10 * timeScore;
+
+  // 6. Recency — prefer unridden routes (10% weight)
+  const recencyScore = lr === '' ? 0.9 : 0.4;
+  score += 0.10 * recencyScore;
+
+  // Type filter (hard filter, not scored)
+  if (prefs.type !== 'any' && routeType.toLowerCase() !== prefs.type.toLowerCase()) {
+    score *= 0.15; // heavy penalty but don't zero out entirely
+  }
+
+  // Busway filter
+  if (prefs.busway === 'avoid' && isBusway) {
+    score *= 0.3;
+  }
+
+  return Math.round(Math.max(0, Math.min(100, score * 100)));
+}
+
+function applyFindMyRide(prefs) {
+  // Score all routes — attach fmrScore to each route object
+  allRoutes.forEach(route => {
+    route.fmrScore = scoreRouteForPrefs(route, prefs);
+  });
+
+  // Override sort to show by match score
+  state.sort = 'fmr_score';
+  const sortSel = document.getElementById('sortSelect');
+  if (sortSel) {
+    // Add the option if it doesn't exist
+    if (!sortSel.querySelector('option[value="fmr_score"]')) {
+      const opt = document.createElement('option');
+      opt.value = 'fmr_score';
+      opt.textContent = 'Best match';
+      sortSel.insertBefore(opt, sortSel.firstChild);
+    }
+    sortSel.value = 'fmr_score';
+  }
+
+  // Re-run filters (which will now sort by fmr_score)
+  applyFilters();
+
+  // After filters run, update match scores on visible cards
+  filteredRoutes.forEach(route => {
+    const slug = slugify(route.route_name);
+    const card = document.getElementById('route-' + slug);
+    if (card) {
+      const matchEl = card.querySelector('.card-match-score');
+      if (matchEl) {
+        matchEl.innerHTML = `<span class="match-num">${escHtml(String(route.fmrScore))}%</span> match`;
+      }
+    }
+  });
+
+  const msg = document.getElementById('fmrResultMsg');
+  if (msg) {
+    const topScore = filteredRoutes[0] ? filteredRoutes[0].fmrScore : 0;
+    msg.textContent = `${filteredRoutes.length} routes scored — best match ${topScore}%`;
+  }
+
+  // Scroll to results
+  const listTab = document.querySelector('.view-tabs');
+  if (listTab) listTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ROUTE COMPARISON
+   ════════════════════════════════════════════════════════════════════ */
+const compareSet = new Set(); // slugs of selected routes (max 3)
+const COMPARE_COLORS = ['#2CBCB3', '#f59e0b', '#8b5cf6']; // teal, amber, purple
+
+function toggleCompare(slug) {
+  if (compareSet.has(slug)) {
+    compareSet.delete(slug);
+  } else {
+    if (compareSet.size >= 3) return; // max 3
+    compareSet.add(slug);
+  }
+  updateCompareUI();
+}
+window.toggleCompare = toggleCompare;
+
+function updateCompareUI() {
+  // Update toggle buttons on cards
+  document.querySelectorAll('.compare-toggle').forEach(btn => {
+    const slug = btn.id.replace('cmp-', '');
+    const active = compareSet.has(slug);
+    btn.classList.toggle('active', active);
+    const check = btn.querySelector('.compare-check');
+    if (check) check.textContent = active ? '✓' : '';
+  });
+
+  // Update floating bar
+  const bar = document.getElementById('compareBar');
+  const chips = document.getElementById('compareChips');
+  const btn = document.getElementById('compareBtn');
+
+  if (compareSet.size > 0) {
+    bar.classList.add('visible');
+    chips.innerHTML = Array.from(compareSet).map(slug => {
+      const route = allRoutes.find(r => slugify(r.route_name) === slug);
+      const name = route ? escHtml(safe(route.route_name)) : slug;
+      return `<span class="compare-chip">
+        ${name}
+        <button class="compare-chip-remove" onclick="toggleCompare('${slug}')" aria-label="Remove ${name}">✕</button>
+      </span>`;
+    }).join('');
+    btn.disabled = compareSet.size < 2;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function initCompare() {
+  const compareBtn = document.getElementById('compareBtn');
+  const closeBtn = document.getElementById('compareClose');
+  const overlay = document.getElementById('compareOverlay');
+
+  if (compareBtn) {
+    compareBtn.addEventListener('click', () => {
+      if (compareSet.size >= 2) showComparison();
+    });
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeComparison);
+  }
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeComparison();
+    });
+  }
+}
+
+function showComparison() {
+  const slugs = Array.from(compareSet);
+  const routes = slugs.map(slug => allRoutes.find(r => slugify(r.route_name) === slug)).filter(Boolean);
+  if (routes.length < 2) return;
+
+  const body = document.getElementById('compareBody');
+  const overlay = document.getElementById('compareOverlay');
+
+  // Build comparison table
+  const metrics = [
+    { label: 'Route', key: 'name' },
+    { label: 'Distance', key: 'distance', unit: ' mi', best: 'closest40' },
+    { label: 'Ascent', key: 'ascent', unit: ' m' },
+    { label: 'Type', key: 'type' },
+    { label: 'Direction', key: 'direction' },
+    { label: 'Ride time', key: 'time' },
+    { label: 'With coffee', key: 'coffee_time' },
+    { label: 'Café', key: 'cafe' },
+    { label: 'Wind', key: 'wind' },
+    { label: 'Match', key: 'match' },
+    { label: 'Busway', key: 'busway' },
+    { label: 'Last ridden', key: 'last_ridden' },
+  ];
+
+  const getCellVal = (route, key) => {
+    switch (key) {
+      case 'name': return escHtml(safe(route.route_name));
+      case 'distance': return safeNum(route.distance_miles) || '—';
+      case 'ascent': return safeNum(route.ascent_metres) || '—';
+      case 'type': return escHtml(safe(route.type) || '—');
+      case 'direction': return escHtml(normaliseDir(route.direction) || '—');
+      case 'time': return escHtml(safe(route.estimated_time) || '—');
+      case 'coffee_time': return escHtml(safe(route.time_with_coffee) || '—');
+      case 'cafe': return route.cafe_name ? escHtml(safe(route.cafe_name)) : '—';
+      case 'wind': {
+        const cmpDay = getSelectedDayWeather();
+        if (!cmpDay) return '—';
+        const ws = windAlignmentScore(normaliseDir(route.direction), cmpDay);
+        const wl = windLabel(ws);
+        return `<span class="compare-wind-cell ${wl.cls.replace('pick-', 'card-wind-badge ')}">${escHtml(wl.text)}</span>`;
+      }
+      case 'match': {
+        if (route.fmrScore !== undefined) return route.fmrScore + '%';
+        const cmpDayM = getSelectedDayWeather();
+        if (!cmpDayM) return '—';
+        const dir = normaliseDir(route.direction);
+        const ws = windAlignmentScore(dir, cmpDayM);
+        const dist = safeNum(route.distance_miles);
+        const targetDist = state.targetDistance || CONFIG.TARGET_DISTANCE || 40;
+        const distDiff = Math.abs(dist - targetDist);
+        const distScore = Math.max(0, 1 - distDiff / 40);
+        const hasCafe = !!(route.cafe_name || '').trim();
+        const lr = safe(route.last_ridden).toLowerCase().trim();
+        const total = (ws * 0.45) + (distScore * 0.35) + ((hasCafe ? 1 : 0) * 0.10) + ((lr === '' ? 0.8 : 0.5) * 0.10);
+        return Math.round(Math.max(0, Math.min(100, (total + 1) / 2 * 100))) + '%';
+      }
+      case 'busway': return (route.busway_segment === true || route.busway_segment === 'TRUE') ? 'Yes' : 'No';
+      case 'last_ridden': return escHtml(safe(route.last_ridden) || 'Never');
+      default: return '—';
+    }
+  };
+
+  let tableHtml = '<table class="compare-table"><tbody>';
+
+  metrics.forEach(metric => {
+    tableHtml += '<tr>';
+    tableHtml += `<th>${escHtml(metric.label)}</th>`;
+    routes.forEach((route, i) => {
+      const val = getCellVal(route, metric.key);
+      const unit = (metric.unit && val !== '—') ? metric.unit : '';
+      const cls = metric.key === 'name' ? ' class="compare-route-name"' : '';
+      tableHtml += `<td${cls}>${val}${unit}</td>`;
+    });
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table>';
+
+  // Add elevation comparison chart area
+  tableHtml += `
+    <div class="compare-elev-wrap">
+      <div class="compare-elev-title">Elevation Profiles (overlaid)</div>
+      <div class="compare-elev-chart">
+        <canvas id="compareElevChart"></canvas>
+      </div>
+    </div>`;
+
+  body.innerHTML = tableHtml;
+  overlay.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+
+  // Load elevation data for comparison chart
+  loadCompareElevations(routes);
+}
+
+function loadCompareElevations(routes) {
+  const canvas = document.getElementById('compareElevChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  const datasets = [];
+  let loaded = 0;
+
+  routes.forEach((route, i) => {
+    if (!route.gpx_url) {
+      loaded++;
+      if (loaded === routes.length) renderCompareChart(canvas, datasets);
+      return;
+    }
+
+    fetch(route.gpx_url)
+      .then(r => r.text())
+      .then(gpxText => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(gpxText, 'text/xml');
+        const trkpts = doc.querySelectorAll('trkpt');
+        const elevations = [];
+        trkpts.forEach(pt => {
+          const ele = pt.querySelector('ele');
+          if (ele) elevations.push(parseFloat(ele.textContent));
+        });
+
+        if (elevations.length > 0) {
+          // Downsample to 100 points for smooth chart
+          const sampled = downsample(elevations, 100);
+          datasets.push({
+            label: safe(route.route_name),
+            data: sampled,
+            borderColor: COMPARE_COLORS[i % COMPARE_COLORS.length],
+            backgroundColor: COMPARE_COLORS[i % COMPARE_COLORS.length] + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            borderWidth: 2,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        loaded++;
+        if (loaded === routes.length) renderCompareChart(canvas, datasets);
+      });
+  });
+}
+
+function downsample(arr, targetLen) {
+  if (arr.length <= targetLen) return arr;
+  const step = arr.length / targetLen;
+  const result = [];
+  for (let i = 0; i < targetLen; i++) {
+    const idx = Math.floor(i * step);
+    result.push(arr[idx]);
+  }
+  return result;
+}
+
+function renderCompareChart(canvas, datasets) {
+  if (datasets.length === 0) {
+    canvas.parentElement.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--grey-300);font-size:0.82rem">No GPX elevation data available for these routes</div>';
+    return;
+  }
+
+  const labels = datasets[0].data.map((_, i) => Math.round(i / datasets[0].data.length * 100) + '%');
+
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { usePointStyle: true, padding: 12, font: { size: 11, family: "'Inter', sans-serif" } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}m`
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: { display: true, text: '% of route', font: { size: 10 } },
+          ticks: { maxTicksToShow: 5, font: { size: 9 } },
+          grid: { display: false }
+        },
+        y: {
+          display: true,
+          title: { display: true, text: 'Elevation (m)', font: { size: 10 } },
+          ticks: { font: { size: 9 } },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
+}
+
+function closeComparison() {
+  document.getElementById('compareOverlay').classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDER
+   ════════════════════════════════════════════════════════════════════ */
+function renderCards() {
+  const grid = document.getElementById('routesGrid');
+
+  if (filteredRoutes.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🚴</div>
+        <h3>No routes match your filters</h3>
+        <p>Try widening your distance or ascent range, or deselecting some directions.</p>
+        <button class="empty-reset" onclick="resetFilters()">↺ Reset all filters</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = filteredRoutes.map((route, idx) => buildCard(route, idx)).join('');
+
+  // Restore open maps
+  filteredRoutes.forEach((route, idx) => {
+    const slug = slugify(route.route_name);
+    if (openMaps[slug]) {
+      setTimeout(() => openMapForCard(route, idx, slug), 50);
+    }
+  });
+
+  // Hash scroll
+  checkHash();
+}
+
+function buildCard(route, idx) {
+  const slug = slugify(route.route_name);
+  const dist = parseFloat(route.distance_miles) || 0;
+  const ascent = parseFloat(route.ascent_metres) || 0;
+  const gpxDisabled = !route.gpx_url ? 'disabled data-tip="GPX not yet available"' : '';
+  const garminDisabled = !route.garmin_link ? 'style="display:none"' : '';
+
+  // Weather-aware row — uses selected day (or default ride day)
+  let weatherRowHtml = '';
+  const selectedDayW = getSelectedDayWeather();
+  if (selectedDayW) {
+    const sun = selectedDayW;
+    const dir = normaliseDir(route.direction);
+    const ws = windAlignmentScore(dir, sun);
+    const wl = windLabel(ws);
+
+    // Calculate match score (same weights as scoreSundayRoutes)
+    const targetDist = state.targetDistance || CONFIG.TARGET_DISTANCE || 40;
+    const distDiff = Math.abs(dist - targetDist);
+    const distScore = Math.max(0, 1 - distDiff / 40);
+    const hasCafe = !!(route.cafe_name || '').trim();
+    const cafeScore = hasCafe ? 1 : 0;
+    const lr = safe(route.last_ridden).toLowerCase().trim();
+    const recencyScore = lr === '' ? 0.8 : 0.5;
+    const total = (ws * 0.45) + (distScore * 0.35) + (cafeScore * 0.10) + (recencyScore * 0.10);
+    const matchPct = Math.round(Math.max(0, Math.min(100, (total + 1) / 2 * 100)));
+
+    // Wind direction mini arrow SVG
+    const windBlowTo = (sun.windDir + 180) % 360;
+    const windArrowSvg = `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g transform="rotate(${windBlowTo}, 8, 8)">
+        <line x1="8" y1="13" x2="8" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="5,6 8,3 11,6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>`;
+
+    const windDotHtml = ws > 0.7 ? '🟢' : ws > 0.25 ? '🟡' : ws > -0.25 ? '🟠' : '🔴';
+    const dayLabel = sun.dayName ? escHtml(sun.dayName.slice(0, 3)) : '';
+
+    weatherRowHtml = `
+      <div class="card-weather-row">
+        <span class="card-weather-icon">${escHtml(sun.icon)}</span>
+        <span class="card-weather-temp">${escHtml(String(sun.tempMax))}°C</span>
+        <span class="card-weather-wind">
+          ${windArrowSvg}
+          ${escHtml(sun.windDirLabel)} ${escHtml(String(sun.windSpeed))} mph
+        </span>
+        <span class="card-wind-badge ${wl.cls}">${windDotHtml} ${escHtml(wl.text)}</span>
+        <span class="card-match-score"><span class="match-num">${matchPct}%</span> match</span>
+      </div>`;
+  }
+
+  const rw = hasRoadwork(safe(route.notes));
+  const warningHtml = safe(route.notes) ? `
+    <div class="warning-banner ${rw ? 'has-roadwork' : ''}">
+      ⚠️ <span>${escHtml(route.notes)}${rw ? '<span class="roadwork-badge">🚧 HAZARD</span>' : ''}</span>
+    </div>` : '';
+
+  const cafeHtml = safe(route.cafe_name) ? `
+    <div class="cafe-row">
+      <span class="cafe-icon">☕</span>
+      <div>
+        <div class="cafe-name">
+          ${route.cafe_maps_url
+            ? `<a href="${escHtml(route.cafe_maps_url)}" target="_blank" rel="noopener noreferrer">${escHtml(route.cafe_name)}</a>`
+            : escHtml(route.cafe_name)}
+        </div>
+        ${route.cafe_hours ? `<div class="cafe-hours">${escHtml(route.cafe_hours)}</div>` : ''}
+      </div>
+    </div>` : '';
+
+  const lastRidden = safe(route.last_ridden)
+    ? `<div class="last-ridden">Last ridden: <span>${escHtml(safe(route.last_ridden))}</span></div>`
+    : `<div class="last-ridden" style="color:var(--grey-300)">Never ridden</div>`;
+
+  const buswayBadge = (route.busway_segment === true || route.busway_segment === 'TRUE')
+    ? `<span class="badge badge-busway">🚌 Busway</span>` : '';
+
+  return `
+    <article class="route-card" id="route-${slug}">
+      <div class="card-main">
+        <div class="card-top">
+          <div>
+            <div class="route-name">${escHtml(route.route_name)}</div>
+            ${route.source ? `<div class="route-source">${escHtml(route.source)}</div>` : ''}
+          </div>
+          <div class="badges">
+            <span class="badge ${distBadgeClass(dist)}">📏 ${dist} mi</span>
+            <span class="badge badge-ascent">⛰ ${ascent} m</span>
+            ${safe(route.type) ? `<span class="badge badge-type-${safe(route.type).toLowerCase() === 'gravel' ? 'gravel' : 'road'}">${safe(route.type).toLowerCase() === 'gravel' ? '🏕' : '🚴'} ${escHtml(safe(route.type))}</span>` : ''}
+            ${normaliseDir(route.direction) ? `<span class="badge ${dirBadgeClass(normaliseDir(route.direction))}">🧭 ${escHtml(normaliseDir(route.direction))}</span>` : ''}
+            ${buswayBadge}
+          </div>
+        </div>
+
+        ${weatherRowHtml}
+
+        <div class="card-meta">
+          <div class="meta-item">
+            <div class="meta-key">⏱ Ride time</div>
+            <div class="meta-val">${escHtml(safe(route.estimated_time) || '—')}</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-key">☕ inc. coffee</div>
+            <div class="meta-val">${escHtml(safe(route.time_with_coffee) || '—')}</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-key">💨 Speed</div>
+            <div class="meta-val mono">${safeNum(route.recommended_speed_mph) || '—'} mph</div>
+          </div>
+        </div>
+
+        ${cafeHtml}
+        ${lastRidden}
+        ${warningHtml}
+
+        <div class="card-actions">
+          <button class="action-btn btn-map" onclick="toggleMap('${slug}', ${idx})" id="mapBtn-${slug}">
+            📍 View on Map
+          </button>
+          <a class="action-btn btn-gpx tooltip" ${gpxDisabled}
+            ${route.gpx_url ? `href="${escHtml(route.gpx_url)}" download` : ''}
+            style="${!route.gpx_url ? 'pointer-events:none;opacity:0.5' : ''}">
+            ⬇️ Download GPX
+          </a>
+          ${route.garmin_link ? `<a class="action-btn btn-garmin" href="${escHtml(route.garmin_link)}" target="_blank" rel="noopener noreferrer">🔗 Garmin Connect</a>` : ''}
+          <button class="action-btn btn-share" onclick="shareRoute('${slug}')" title="Copy share link">🔗 Share</button>
+          <button class="compare-toggle" onclick="toggleCompare('${slug}')" id="cmp-${slug}" title="Add to comparison">
+            <span class="compare-check"></span> Compare
+          </button>
+        </div>
+      </div>
+
+      <!-- Map panel (hidden until toggled) -->
+      <div class="map-panel" id="mapPanel-${slug}">
+        <div class="stats-bar" id="statsBar-${slug}">
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">📏</span>
+            <div class="stats-bar-val">${dist}</div>
+            <div class="stats-bar-key">miles</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">⛰</span>
+            <div class="stats-bar-val">${ascent}</div>
+            <div class="stats-bar-key">metres ascent</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">⏱</span>
+            <div class="stats-bar-val">${safe(route.estimated_time).replace(' h ','h ').replace(' min','m') || '—'}</div>
+            <div class="stats-bar-key">ride time</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">☕</span>
+            <div class="stats-bar-val">${safe(route.time_with_coffee).replace(' h ','h ').replace(' min','m') || '—'}</div>
+            <div class="stats-bar-key">w/ coffee</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">🧭</span>
+            <div class="stats-bar-val">${normaliseDir(route.direction) || '—'}</div>
+            <div class="stats-bar-key">direction</div>
+          </div>
+          <div class="stats-bar-item">
+            <span class="stats-bar-icon">💨</span>
+            <div class="stats-bar-val">${safeNum(route.recommended_speed_mph) || '—'}</div>
+            <div class="stats-bar-key">rec. mph</div>
+          </div>
+        </div>
+        <!-- Road closures shown on card map only, not as text -->
+        <div class="map-container" id="map-${slug}"></div>
+        <div class="elevation-wrap">
+          <div class="elevation-label">Elevation Profile</div>
+          <div class="elevation-chart-wrap">
+            <canvas id="elev-${slug}"></canvas>
+          </div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MAP LOGIC
+   ════════════════════════════════════════════════════════════════════ */
+function toggleMap(slug, idx) {
+  const panel = document.getElementById(`mapPanel-${slug}`);
+  const btn   = document.getElementById(`mapBtn-${slug}`);
+  if (!panel || !btn) return;
+  const isOpen = panel.classList.contains('open');
+
+  if (isOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    btn.textContent = '📍 View on Map';
+    delete openMaps[slug];
+    // Cleanup instances to save memory
+    if (leafletMaps[slug]) { leafletMaps[slug].remove(); delete leafletMaps[slug]; }
+    if (elevCharts[slug]) { elevCharts[slug].destroy(); delete elevCharts[slug]; }
+  } else {
+    const route = filteredRoutes[idx];
+    openMaps[slug] = true;
+    openMapForCard(route, idx, slug);
+  }
+}
+
+/**
+ * Re-initializes a map and chart on a specific card.
+ * Used both by toggleMap and to restore maps after renderCards() replaces the DOM.
+ */
+function openMapForCard(route, idx, slug) {
+  const panel = document.getElementById(`mapPanel-${slug}`);
+  const btn   = document.getElementById(`mapBtn-${slug}`);
+  if (!panel || !btn) return;
+
+  panel.classList.add('open');
+  btn.classList.add('active');
+  btn.textContent = '🗺 Hide Map';
+
+  // CRITICAL: If an instance already exists in our registry, it's attached to an old 
+  // DOM element that was just blown away by renderCards. We must remove it.
+  if (leafletMaps[slug]) {
+    try { leafletMaps[slug].remove(); } catch(e) {}
+    delete leafletMaps[slug];
+  }
+  if (elevCharts[slug]) {
+    try { elevCharts[slug].destroy(); } catch(e) {}
+    delete elevCharts[slug];
+  }
+
+  // Brief delay to ensure DOM is ready and transitioned
+  setTimeout(() => initMap(slug, route), 80);
+}
+
+const leafletMaps = {};
+const elevCharts = {};
+
+/* ── Shared café helpers (used by master map + card maps) ── */
+function buildCafePopupHtml(cafe) {
+  const name    = escHtml(safe(cafe.cafe_name));
+  const village = escHtml(safe(cafe.village));
+  const rating  = cafe.rating ? '⭐'.repeat(Math.min(parseInt(cafe.rating) || 0, 5)) : '';
+  const satHrs  = safe(cafe.saturday_hours);
+  const sunHrs  = safe(cafe.sunday_hours);
+  const hours   = (satHrs || sunHrs)
+    ? `<div style="font-size:0.75rem;margin-top:0.3rem">` +
+      (satHrs ? `<div>Sat: ${escHtml(satHrs)}</div>` : '') +
+      (sunHrs ? `<div>Sun: ${escHtml(sunHrs)}</div>` : '') +
+      `</div>` : '';
+  const notes   = safe(cafe.notes) ? `<div style="font-size:0.7rem;color:#666;margin-top:0.2rem">${escHtml(cafe.notes)}</div>` : '';
+  const website = safe(cafe.website)
+    ? `<a href="${escHtml(cafe.website)}" target="_blank" rel="noopener noreferrer" style="display:block;font-size:0.7rem;color:#e8621a;margin-top:0.2rem">Visit website ↗</a>` : '';
+  return `
+    <div style="min-width:140px">
+      <div style="font-weight:700;font-size:0.85rem">🍳 ${name}</div>
+      ${village ? `<div style="font-size:0.75rem;color:#555">${village}</div>` : ''}
+      ${rating ? `<div style="font-size:0.8rem">${rating}</div>` : ''}
+      ${hours}${notes}${website}
+    </div>`;
+}
+
+function addCafesToMap(map, fontSize) {
+  if (!allCafes || allCafes.length === 0) return;
+  const bounds = map.getBounds();
+  allCafes.forEach(cafe => {
+    const lat = parseFloat(cafe.lat);
+    const lon = parseFloat(cafe.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    if (!bounds.contains([lat, lon])) return;
+    const cafeIcon = L.icon({
+      iconUrl: 'images/cafe-icon.png', shadowUrl: '',
+      iconSize: [fontSize, fontSize], iconAnchor: [fontSize/2, fontSize],
+      popupAnchor: [0, -fontSize], className: 'cafe-marker'
+    });
+    const name = escHtml(safe(cafe.cafe_name));
+    L.marker([lat, lon], { icon: cafeIcon })
+      .addTo(map)
+      .bindPopup(buildCafePopupHtml(cafe), { maxWidth: 220 })
+      .bindTooltip(`🍳 ${name}`, { sticky: true });
+  });
+}
+
+function calcBearing(a, b) {
+  const dLon = (b.lng - a.lng) * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(b.lat * Math.PI / 180);
+  const x = Math.cos(a.lat * Math.PI / 180) * Math.sin(b.lat * Math.PI / 180) -
+            Math.sin(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.cos(dLon);
+  const brng = Math.atan2(y, x) * 180 / Math.PI;
+  return (brng + 360) % 360;
+}
+
+function addDirectionArrows(container, gpxLayer) {
+  const points = [];
+  gpxLayer.eachLayer(l => {
+    if (l.getLatLngs) {
+      const lls = l.getLatLngs();
+      if (lls.length > 0 && lls[0] instanceof L.LatLng) {
+        lls.forEach(ll => points.push(ll));
+      } else if (Array.isArray(lls[0])) {
+        lls.forEach(arr => arr.forEach(ll => points.push(ll)));
+      }
+    }
+  });
+  if (points.length < 2) return;
+
+  const ARROW_INTERVAL_M = 12000; // ~7.5 miles (12km)
+  let accumulatedDist = 0;
+  const colour = gpxLayer.options.polyline_options.color || '#e8621a';
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i+1];
+    const d = p1.distanceTo(p2);
+    accumulatedDist += d;
+
+    if (accumulatedDist >= ARROW_INTERVAL_M) {
+      const bearing = calcBearing(p1, p2);
+      const icon = L.divIcon({
+        className: '',
+        html: `<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${bearing}deg); filter: drop-shadow(0 0 1.5px white); opacity:0.85; pointer-events:none; display:block;">
+                 <path d="M3 10L7 6L11 10" stroke="${colour}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+               </svg>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      L.marker(p2, { icon, interactive: false }).addTo(container);
+      accumulatedDist = 0;
+    }
+  }
+}
+
+function initMap(slug, route) {
+  if (leafletMaps[slug]) {
+    leafletMaps[slug].invalidateSize();
+    return;
+  }
+
+  const mapEl = document.getElementById(`map-${slug}`);
+  if (!mapEl) return;
+
+  const lat = parseFloat(route.start_lat) || SWAVESEY.lat;
+  const lon = parseFloat(route.start_lon) || SWAVESEY.lon;
+
+  const map = L.map(mapEl).setView([lat, lon], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  leafletMaps[slug] = map;
+
+  // Start marker
+  const startIcon = L.divIcon({
+    html: `<div style="background:var(--green);border:3px solid white;border-radius:50%;width:20px;height:20px;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
+    iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+  });
+  L.marker([lat, lon], { icon: startIcon })
+    .addTo(map)
+    .bindPopup(`<b>Start:</b> ${escHtml(safe(route.route_name))} — ${safeNum(route.distance_miles)} miles`);
+
+  // GPX track
+  if (route.gpx_url) {
+    new L.GPX(route.gpx_url, {
+      async: true,
+      marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '', wptIconUrls: { '': '' } },
+      polyline_options: { color: '#e8621a', weight: 3.5, opacity: 0.9 }
+    }).on('loaded', function(e) {
+      map.fitBounds(e.target.getBounds());
+      buildElevationChart(slug, e.target);
+      addDirectionArrows(map, e.target);
+      // Add café markers once the map settles to the new bounds
+      map.once('moveend', function() {
+            addCafesToMap(map, 22);
+            addClosuresToCardMap(map);
+          });
+      e.target.eachLayer(function(layer) {
+        if (layer.setStyle) {
+          layer.on('mouseover', function() { this.setStyle({ weight: 5, opacity: 1.0 }); });
+          layer.on('mouseout', function() { this.setStyle({ weight: 3.5, opacity: 0.9 }); });
+        }
+      });
+    }).addTo(map);
+  } else {
+    buildDemoElevationChart(slug, route);
+  }
+
+  map.invalidateSize();
+}
+
+function buildElevationChart(slug, gpxLayer) {
+  const canvas = document.getElementById(`elev-${slug}`);
+  if (!canvas) return;
+  // Use leaflet-gpx's built-in elevation parser: returns [[dist_km, elev_m, label], ...]
+  let elevArr = [];
+  try { elevArr = gpxLayer.get_elevation_data() || []; } catch(e) {}
+  if (elevArr.length === 0) { buildDemoElevationChart(slug); return; }
+  // Extract just the elevation values (index 1), downsample for chart performance
+  const step = Math.max(1, Math.floor(elevArr.length / 200));
+  const data = elevArr.filter((_, i) => i % step === 0).map(pt => pt[1]);
+  if (data.length === 0) { buildDemoElevationChart(slug); return; }
+  createElevChart(slug, data);
+}
+
+function buildDemoElevationChart(slug, route) {
+  // Generate plausible demo elevation profile
+  const base = 10;
+  const pts = 30;
+  const ascent = parseFloat((route||{}).ascent_metres) || 80;
+  const data = Array.from({length: pts}, (_, i) => {
+    return base + Math.sin(i / pts * Math.PI * 2) * (ascent / 4) + Math.random() * 8;
+  });
+  createElevChart(slug, data);
+}
+
+function createElevChart(slug, data) {
+  if (elevCharts[slug]) elevCharts[slug].destroy();
+  const canvas = document.getElementById(`elev-${slug}`);
+  if (!canvas) return;
+
+  const labels = data.map((_, i) => '');
+  elevCharts[slug] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#e8621a',
+        backgroundColor: 'rgba(232,98,26,0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: {
+          display: true,
+          ticks: { font: { size: 9 }, color: '#8c97a8', maxTicksLimit: 4 },
+          grid: { color: '#eef0f4' }
+        }
+      }
+    }
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SHARE / HASH
+   ════════════════════════════════════════════════════════════════════ */
+function shareRoute(slug) {
+  const url = `${location.origin}${location.pathname}#${slug}`;
+  navigator.clipboard?.writeText(url).then(() => {
+    // Visual feedback
+    const btn = document.querySelector(`#route-${slug} .btn-share`);
+    if (btn) { btn.textContent = '✅ Copied!'; setTimeout(() => { btn.textContent = '🔗 Share'; }, 1800); }
+  }).catch(() => {
+    window.location.hash = slug;
+  });
+  window.location.hash = slug;
+}
+
+function checkHash() {
+  const hash = window.location.hash.replace('#', '');
+  if (!hash) return;
+  const el = document.getElementById(`route-${hash}`);
+  if (el) {
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('pulse');
+      setTimeout(() => el.classList.remove('pulse'), 1400);
+    }, 200);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FILTER CONTROLS
+   ════════════════════════════════════════════════════════════════════ */
+function debouncedFilter() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(applyFilters, 120);
+}
+
+function updateCounts() {
+  const total = allRoutes.length;
+  const shown = filteredRoutes.length;
+  document.getElementById('resultCount').textContent = `${shown} of ${total}`;
+  document.getElementById('hero-total').textContent = total;
+  document.getElementById('hero-road').textContent  = allRoutes.filter(r => safe(r.type).toLowerCase() === 'road').length;
+  const mtbEl = document.getElementById('hero-mtb');
+  if (mtbEl) mtbEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'mtb').length;
+  const gravelEl = document.getElementById('hero-gravel');
+  if (gravelEl) gravelEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'gravel').length;
+}
+
+function resetFilters() {
+  state.type = 'all';
+  state.distMin = 0; state.distMax = 160;
+  state.ascentMin = 0; state.ascentMax = 2500;
+  state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']); // all 8 when all 4 cardinals checked
+  state.mapDisplay = 'all';
+  state.excludeBusway = false;
+  state.closureMode = 'closures';
+
+  // Clear saved preferences
+  localStorage.removeItem(PREFS_KEY);
+
+  // Reset map position flag so view centres on HQ again
+  if (masterMapInstance) masterMapInstance._userMoved = false;
+
+  // Reset UI
+  document.getElementById('distMin').value = 0;
+  document.getElementById('distMax').value = 160;
+  document.getElementById('ascentMin').value = 0;
+  document.getElementById('ascentMax').value = 2500;
+  document.getElementById('distMinVal').textContent = '0 mi';
+  document.getElementById('distMaxVal').textContent = '160 mi';
+  document.getElementById('ascentMinVal').textContent = '0 m';
+  document.getElementById('ascentMaxVal').textContent = '2500 m';
+  document.getElementById('buswayToggle').checked = false;
+  document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'closures'));
+  updateClosureLayers();
+  document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
+  document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
+  document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
+
+  applyFilters();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   USER PREFERENCES — persist filter settings across sessions
+   ════════════════════════════════════════════════════════════════════ */
+const PREFS_KEY = 'socc_user_prefs';
+
+function savePrefs() {
+  try {
+    const prefs = {
+      targetDistance: state.targetDistance,
+      excludeBusway: state.excludeBusway,
+      closureMode: state.closureMode,
+      directions: [...state.directions],
+      sort: state.sort,
+      type: state.type,
+      distMin: state.distMin,
+      distMax: state.distMax,
+      ascentMin: state.ascentMin,
+      ascentMax: state.ascentMax
+    };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (e) { /* localStorage full or disabled */ }
+}
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return;
+    const prefs = JSON.parse(raw);
+
+    // Validate and apply each preference
+    if (typeof prefs.targetDistance === 'number' && prefs.targetDistance >= 10 && prefs.targetDistance <= 130) {
+      state.targetDistance = prefs.targetDistance;
+      const slider = document.getElementById('plannerDist');
+      if (slider) { slider.value = prefs.targetDistance; }
+      const label = document.getElementById('plannerDistVal');
+      if (label) label.textContent = prefs.targetDistance + ' mi';
+    }
+
+    // Sidebar Distance
+    if (typeof prefs.distMin === 'number') {
+      state.distMin = prefs.distMin;
+      const el = document.getElementById('distMin');
+      if (el) el.value = prefs.distMin;
+      const label = document.getElementById('distMinVal');
+      if (label) label.textContent = prefs.distMin + ' mi';
+    }
+    if (typeof prefs.distMax === 'number') {
+      state.distMax = prefs.distMax;
+      const el = document.getElementById('distMax');
+      if (el) el.value = prefs.distMax;
+      const label = document.getElementById('distMaxVal');
+      if (label) label.textContent = prefs.distMax + ' mi';
+    }
+
+    // Sidebar Ascent
+    if (typeof prefs.ascentMin === 'number') {
+      state.ascentMin = prefs.ascentMin;
+      const el = document.getElementById('ascentMin');
+      if (el) el.value = prefs.ascentMin;
+      const label = document.getElementById('ascentMinVal');
+      if (label) label.textContent = prefs.ascentMin + ' m';
+    }
+    if (typeof prefs.ascentMax === 'number') {
+      state.ascentMax = prefs.ascentMax;
+      const el = document.getElementById('ascentMax');
+      if (el) el.value = prefs.ascentMax;
+      const label = document.getElementById('ascentMaxVal');
+      if (label) label.textContent = prefs.ascentMax + ' m';
+    }
+
+    if (typeof prefs.excludeBusway === 'boolean') {
+      state.excludeBusway = prefs.excludeBusway;
+      const cb = document.getElementById('buswayToggle');
+      if (cb) cb.checked = prefs.excludeBusway;
+    }
+
+    if (['off', 'closures', 'all'].includes(prefs.closureMode)) {
+      state.closureMode = prefs.closureMode;
+      document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === prefs.closureMode));
+    }
+
+    if (Array.isArray(prefs.directions) && prefs.directions.length > 0) {
+      const valid = ['N','NE','E','SE','S','SW','W','NW'];
+      const dirs = prefs.directions.filter(d => valid.includes(d));
+      if (dirs.length > 0) {
+        state.directions = new Set(dirs);
+        document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
+          cb.checked = dirs.includes(cb.value);
+        });
+      }
+    }
+
+    if (typeof prefs.sort === 'string') {
+      state.sort = prefs.sort;
+      const sel = document.getElementById('sortSelect');
+      if (sel) sel.value = prefs.sort;
+    }
+
+    if (typeof prefs.type === 'string') {
+      state.type = prefs.type;
+      document.querySelectorAll('#typeToggle .toggle-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === prefs.type));
+    }
+  } catch (e) { /* corrupt data — ignore */ }
+}
+
+function initControls() {
+  loadPrefs();
+
+  // Type toggle
+  document.querySelectorAll('#typeToggle .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.type = btn.dataset.val;
+      savePrefs();
+      applyFilters();
+    });
+  });
+
+  // Range sliders
+  ['distMin','distMax','ascentMin','ascentMax'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => {
+      const v = e.target.value;
+      const labelId = id + 'Val';
+      const unit = id.startsWith('dist') ? ' mi' : ' m';
+      document.getElementById(labelId).textContent = v + unit;
+      state[id] = parseInt(v);
+      savePrefs();
+      debouncedFilter();
+    });
+  });
+
+  // Direction checkboxes — 8 individual compass points
+  document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const checked = [...document.querySelectorAll('#dirChecks input:checked')].map(c => c.value);
+      state.directions = new Set(checked);
+      savePrefs();
+      debouncedFilter();
+    });
+  });
+
+  // Map display toggle (Routes / All / Cafés)
+  document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.mapDisplay = btn.dataset.val;
+      applyFilters();
+    });
+  });
+
+  // Busway toggle — also refresh ride planner picks
+  document.getElementById('buswayToggle').addEventListener('change', e => {
+    state.excludeBusway = e.target.checked;
+    savePrefs();
+    applyFilters();
+    // Refresh ride planner to respect busway preference
+    const dayW = getSelectedDayWeather();
+    if (dayW) renderRidePlannerForDay(dayW);
+  });
+
+  // Closure mode toggle (Off / Closures / All)
+  document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.closureMode = btn.dataset.val;
+      savePrefs();
+      updateClosureLayers();
+    });
+  });
+
+  // Sort
+  document.getElementById('sortSelect').addEventListener('change', e => {
+    state.sort = e.target.value;
+    savePrefs();
+    applyFilters();
+  });
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('click', resetFilters);
+
+  // Mobile filter toggle
+  document.getElementById('filterToggle').addEventListener('click', () => {
+    const body = document.getElementById('sidebarBody');
+    body.classList.toggle('open');
+  });
+
+  // Hash changes
+  window.addEventListener('hashchange', checkHash);
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   MASTER MAP — single map view of all filtered routes
+   ════════════════════════════════════════════════════════════════════ */
+
+// Swavesey start point — where most routes begin from
+const SWAVESEY = { lat: 52.3063, lon: -0.0004 };  // Swavesey Busway stop
+
+// Compass direction → bearing (degrees clockwise from north)
+const DIR_BEARING = {
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315
+};
+
+// Approximate lat/lon for a route based on direction and distance
+// Uses actual start_lat/start_lon from sheet if available, otherwise
+// estimates a point ~35% of total distance out from Swavesey in the
+// named direction (representing the rough midpoint of the outward leg
+// on a circular route).
+function routeApproxCoords(route) {
+  const lat = parseFloat(route.start_lat);
+  const lon = parseFloat(route.start_lon);
+  if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+    return { lat, lon, exact: true };
+  }
+  // Fallback: estimate from direction + distance
+  const dir   = normaliseDir(route.direction);
+  const bearing = DIR_BEARING[dir] ?? 180; // default south if unknown
+  const dist  = safeNum(route.distance_miles) || 20;
+  const reach = dist * 0.35; // miles to the approximate midpoint
+  const bearingRad = bearing * Math.PI / 180;
+  // Degrees per mile at this latitude
+  const latPerMile = 1 / 69.0;
+  const lonPerMile = 1 / (69.0 * Math.cos(SWAVESEY.lat * Math.PI / 180));
+  return {
+    lat: SWAVESEY.lat + reach * Math.cos(bearingRad) * latPerMile,
+    lon: SWAVESEY.lon + reach * Math.sin(bearingRad) * lonPerMile,
+    exact: false
+  };
+}
+
+// Colour for circle marker — matches card badge colours
+function markerColour(miles) {
+  if (miles < 25)  return '#22a05a'; // green
+  if (miles <= 40) return '#d97706'; // amber
+  return '#dc2626';                  // red
+}
+
+let masterMapInstance = null;
+let masterMarkerLayer = null;  // circle markers — top layer, receives clicks
+let masterCafeLayer   = null;  // café markers — middle layer
+let masterGpxLayer    = null;  // GPX track lines — bottom layer, interactive with popup + hover
+let masterClosureLayer = null;  // road closure icons (closureMode: closures/all)
+let masterRoadworkLayer = null; // roadwork icons (closureMode: all only)
+let currentView = 'list';
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('listPanel').style.display = view === 'list' ? '' : 'none';
+  document.getElementById('masterMapPanel').classList.toggle('active', view === 'map');
+  document.getElementById('tabList').classList.toggle('active', view === 'list');
+  document.getElementById('tabMap').classList.toggle('active', view === 'map');
+  if (view === 'map') refreshMasterMap();
+}
+
+function buildRoutePopupHtml(route, slug) {
+  const dist      = safeNum(route.distance_miles);
+  const dir       = normaliseDir(route.direction) || '\u2014';
+  const timeStr   = safe(route.estimated_time) || '\u2014';
+  const ascentStr = safeNum(route.ascent_metres) ? safeNum(route.ascent_metres) + ' m' : '\u2014';
+  const coords    = routeApproxCoords(route);
+  const exactNote = coords.exact ? '' : '<div style="font-size:0.7rem;color:#999;margin-top:0.3rem">\u26a0\ufe0f Approximate position</div>';
+
+  return `
+    <div class="map-route-popup">
+      <div class="pop-name">${escHtml(safe(route.route_name))}</div>
+      <div class="pop-stats">
+        <span>\ud83d\udccf ${dist} mi</span>
+        <span>\u26f0 ${ascentStr}</span>
+        <span>\u23f1 ${timeStr}</span>
+        <span>\ud83e\udded ${dir}</span>
+      </div>
+      ${safe(route.garmin_link) ? `<a href="${escHtml(safe(route.garmin_link))}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;margin-bottom:0.4rem;font-size:0.75rem;color:#e8621a">Open in Garmin Connect \u2197</a>` : ''}
+      <button class="pop-btn" onclick="window.scrollToCard('${slug}')">
+        View full details \u2192
+      </button>
+      ${exactNote}
+    </div>`;
+}
+
+async function refreshMasterMap() {
+  if (currentView !== 'map') return; // don't bother if not visible
+
+  const mapEl = document.getElementById('masterMap');
+
+  // First time: defer map creation until after the container has painted
+  if (!masterMapInstance) {
+    // requestAnimationFrame ensures the browser has rendered the panel
+    // before Leaflet tries to measure it — fixes blank tile issue on mobile
+    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
+    masterMapInstance = L.map(mapEl)
+                         .setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+      crossOrigin: true
+    }).addTo(masterMapInstance);
+    // Home marker for Swavesey
+    L.marker([SWAVESEY.lat, SWAVESEY.lon], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:14px;height:14px;background:#1a2e4a;border:3px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+        iconSize: [14, 14], iconAnchor: [7, 7]
+      })
+    }).addTo(masterMapInstance).bindTooltip('🏠 Swavesey HQ', { permanent: false });
+    // Track user-initiated map moves (pan/zoom) to avoid resetting view on filter change
+    masterMapInstance._userMoved = false;
+    masterMapInstance.on('dragend zoomend', function(e) {
+      // Only set flag for user interactions, not programmatic moves
+      if (!masterMapInstance._programmaticMove) masterMapInstance._userMoved = true;
+    });
+    masterMapInstance.invalidateSize();
+  }
+
+  // Always re-create layers in correct z-order: GPX (bottom), cafés (middle), route markers (top)
+  if (masterGpxLayer)    { masterGpxLayer.clearLayers(); }
+  else { masterGpxLayer  = L.layerGroup().addTo(masterMapInstance); }
+  if (masterCafeLayer)   { masterCafeLayer.clearLayers(); }
+  else { masterCafeLayer = L.layerGroup().addTo(masterMapInstance); }
+  if (masterMarkerLayer) { masterMarkerLayer.clearLayers(); }
+  else { masterMarkerLayer = L.layerGroup().addTo(masterMapInstance); }
+
+  // Plot café markers when display mode includes cafés
+  const showCafes = (state.mapDisplay === 'all' || state.mapDisplay === 'cafes');
+  const showRoutes = (state.mapDisplay === 'all' || state.mapDisplay === 'routes');
+
+  if (showCafes && allCafes.length > 0) {
+    allCafes.forEach(cafe => {
+      const lat = parseFloat(cafe.lat);
+      const lon = parseFloat(cafe.lon);
+      if (isNaN(lat) || isNaN(lon)) return;
+
+      const cafeIcon = L.icon({
+        iconUrl: 'images/cafe-icon.png', shadowUrl: '',
+        iconSize: [36, 36], iconAnchor: [18, 36],
+        popupAnchor: [0, -36], className: 'cafe-marker'
+      });
+      const name = escHtml(safe(cafe.cafe_name));
+      L.marker([lat, lon], { icon: cafeIcon })
+        .addTo(masterCafeLayer)
+        .bindPopup(buildCafePopupHtml(cafe), { maxWidth: 220 })
+        .bindTooltip(`🍳 ${name}`, { sticky: true });
+    });
+  }
+
+  // In cafes-only mode, fit to café markers and skip routes
+  if (!showRoutes) {
+    if (allCafes.length > 0) {
+      const cafeBounds = allCafes
+        .filter(c => !isNaN(parseFloat(c.lat)) && !isNaN(parseFloat(c.lon)))
+        .map(c => [parseFloat(c.lat), parseFloat(c.lon)]);
+      if (cafeBounds.length > 0) masterMapInstance.fitBounds(cafeBounds, { padding: [40, 40], maxZoom: 12 });
+    }
+    masterMapInstance.invalidateSize(true);
+    return;
+  }
+
+  if (filteredRoutes.length === 0) {
+    // Zoom back to home if nothing to show
+    masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    return;
+  }
+
+  const bounds = [[SWAVESEY.lat, SWAVESEY.lon]];
+
+  filteredRoutes.forEach((route, idx) => {
+    const coords = routeApproxCoords(route);
+    const dist   = safeNum(route.distance_miles);
+    const colour = markerColour(dist);
+    const slug   = slugify(safe(route.route_name));
+
+    // Radius scales slightly with distance so big routes stand out
+    const radius = 5 + Math.min(dist / 20, 5);
+
+    const marker = L.circleMarker([coords.lat, coords.lon], {
+      radius: Math.max(radius, 10),  // minimum 10px — easier to tap on mobile
+      color: '#ffffff',
+      fillColor: colour,
+      fillOpacity: 0.9,
+      weight: 2,
+      opacity: 1,
+      interactive: true,
+    });
+
+    marker.bindPopup(buildRoutePopupHtml(route, slug), { maxWidth: 240 });
+
+    marker.bindTooltip(escHtml(safe(route.route_name)), { sticky: true });
+    // Explicit click handler — more reliable than popup onclick across browsers
+    marker.on('click', () => marker.openPopup());
+    marker.addTo(masterMarkerLayer);
+    bounds.push([coords.lat, coords.lon]);
+
+    // If this route has a GPX file, draw the track on the master map
+    // Rotate through a palette so overlapping tracks are distinguishable
+    const GPX_PALETTE = [
+      '#e8621a', // orange
+      '#2563eb', // blue
+      '#16a34a', // green
+      '#9333ea', // purple
+      '#dc2626', // red
+      '#0891b2', // cyan
+      '#d97706', // amber
+      '#be185d', // pink
+      '#059669', // emerald
+      '#7c3aed', // violet
+    ];
+    // Dash patterns cycle independently of colours → 10 colours × 4 styles = 40 combos
+    const GPX_DASHES = [
+      null,          // solid
+      '12 6',        // dashed
+      '4 6',         // dotted
+      '12 4 4 4',    // dash-dot
+    ];
+    const gpxColour = GPX_PALETTE[idx % GPX_PALETTE.length];
+    const gpxDash   = GPX_DASHES[Math.floor(idx / GPX_PALETTE.length) % GPX_DASHES.length];
+
+    if (safe(route.gpx_url)) {
+      new L.GPX(safe(route.gpx_url), {
+        async: true,
+        polyline_options: {
+          color: gpxColour,
+          opacity: 0.7,
+          weight: 4,
+          dashArray: gpxDash,
+        },
+        marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '', wptIconUrls: { '': '' } }
+      }).on('loaded', function(e) {
+        // Bind popup and hover effects to every polyline sublayer
+        const popupHtml = buildRoutePopupHtml(route, slug);
+        const routeLabel = escHtml(safe(route.route_name));
+        e.target.eachLayer(function(layer) {
+          if (layer.bindPopup) {
+            layer.bindPopup(popupHtml, { maxWidth: 240 });
+          }
+          if (layer.bindTooltip) {
+            layer.bindTooltip(routeLabel, { sticky: true });
+          }
+          if (layer.setStyle) {
+            layer.on('mouseover', function() {
+              this.setStyle({ weight: 7, opacity: 1.0, dashArray: gpxDash });
+            });
+            layer.on('mouseout', function() {
+              this.setStyle({ weight: 4, opacity: 0.7, dashArray: gpxDash });
+            });
+          }
+        });
+
+        // Add to the BOTTOM layer so circle markers always sit on top and receive clicks first
+        masterGpxLayer.addLayer(e.target);
+        addDirectionArrows(masterGpxLayer, e.target);
+      }).on('error', function() {
+        // GPX load failed silently — marker still shows
+      });
+    }
+  });
+
+  // Preserve user's manual zoom/pan — only reset view on initial load or "Reset all filters"
+  if (!masterMapInstance._userMoved) {
+    const isDefaultView = state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
+    masterMapInstance._programmaticMove = true;
+    if (isDefaultView) {
+      masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    } else {
+      masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+    }
+    setTimeout(() => { masterMapInstance._programmaticMove = false; }, 500);
+  }
+
+  // Invalidate size in case the panel just became visible
+  masterMapInstance.invalidateSize(true); // force tile reload after fitBounds
+
+  // Overlay road closures — ensure layers are on the master map
+  if (CONFIG.ROAD_CLOSURES_ENABLED && CONFIG.TOMTOM_API_KEY) {
+    loadMapClosures().then(() => {
+      updateClosureLayers();
+    }).catch(() => {});
+  }
+}
+
+/** Fetch all road closures/roadworks for the route area and overlay on maps */
+/** Update master map closure/roadwork layers based on state.closureMode */
+function updateClosureLayers() {
+  if (!masterMapInstance) return;
+  if (state.closureMode === 'off') {
+    if (masterClosureLayer && masterMapInstance.hasLayer(masterClosureLayer)) masterMapInstance.removeLayer(masterClosureLayer);
+    if (masterRoadworkLayer && masterMapInstance.hasLayer(masterRoadworkLayer)) masterMapInstance.removeLayer(masterRoadworkLayer);
+  } else if (state.closureMode === 'closures') {
+    if (masterClosureLayer && !masterMapInstance.hasLayer(masterClosureLayer)) masterMapInstance.addLayer(masterClosureLayer);
+    if (masterRoadworkLayer && masterMapInstance.hasLayer(masterRoadworkLayer)) masterMapInstance.removeLayer(masterRoadworkLayer);
+  } else { // 'all'
+    if (masterClosureLayer && !masterMapInstance.hasLayer(masterClosureLayer)) masterMapInstance.addLayer(masterClosureLayer);
+    if (masterRoadworkLayer && !masterMapInstance.hasLayer(masterRoadworkLayer)) masterMapInstance.addLayer(masterRoadworkLayer);
+  }
+  // Refresh all open card maps
+  Object.keys(leafletMaps).forEach(slug => {
+    const map = leafletMaps[slug];
+    if (map) refreshCardMapClosures(map);
+  });
+}
+
+/** Remove and re-add closure overlays on a card map based on closureMode */
+function refreshCardMapClosures(map) {
+  // Remove existing closure overlays
+  const toRemove = [];
+  map.eachLayer(l => { if (l._isClosureOverlay) toRemove.push(l); });
+  toRemove.forEach(l => map.removeLayer(l));
+  // Re-add if mode allows
+  if (state.closureMode !== 'off') addClosuresToCardMap(map);
+}
+
+let _closuresLoaded = false;
+let _closureIncidents = []; // stored for reuse by card maps
+let _pendingClosureMaps = []; // card maps awaiting closure data
+
+function formatClosureDates(props) {
+  if (!props.startTime && !props.endTime) return '';
+  const fmt = d => { try { return new Date(d).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}); } catch(e) { return ''; } };
+  const s = props.startTime ? fmt(props.startTime) : '';
+  const e = props.endTime ? fmt(props.endTime) : '';
+  return s && e ? `${s} – ${e}` : s ? `From ${s}` : e ? `Until ${e}` : '';
+}
+
+function buildClosurePopup(inc) {
+  const props = inc.properties || {};
+  const isClosure = inc._isClosure;
+  const desc = inc._desc;
+  const from = escHtml(props.from || '');
+  const to = escHtml(props.to || '');
+  const dateStr = formatClosureDates(props);
+  const icon = isClosure ? '🚫' : '🚧';
+  return `<div style="min-width:160px;font-size:0.82rem">
+    <div style="font-weight:700;font-size:0.9rem">${icon} ${escHtml(desc)}</div>
+    ${from ? `<div style="margin-top:0.3rem;color:#555">${from}${to ? ' → ' + to : ''}</div>` : ''}
+    ${dateStr ? `<div style="margin-top:0.2rem;font-size:0.75rem;color:#888">${dateStr}</div>` : ''}
+  </div>`;
+}
+
+async function loadMapClosures() {
+  if (_closuresLoaded) return; // already loaded
+
+  // Create layers (don't add to map yet — master map may not exist)
+  if (masterClosureLayer) { masterClosureLayer.clearLayers(); }
+  else { masterClosureLayer = L.layerGroup(); }
+  if (masterRoadworkLayer) { masterRoadworkLayer.clearLayers(); }
+  else { masterRoadworkLayer = L.layerGroup(); }
+
+  try {
+    // Wide bbox covering Cambridgeshire cycling area (Bedford to Ely to Newmarket)
+    const bbox = '-0.55,52.0,0.45,52.55';
+    const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
+      + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
+      + `&bbox=${bbox}`
+      + `&fields=${encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,startTime,endTime,events{description}}}}')}`
+      + `&language=en-GB`
+      + `&categoryFilter=6,7,8,9`
+      + `&timeValidityFilter=present`;
+
+    const resp = await fetch(apiUrl);
+    if (!resp.ok) { dbg(`TomTom map closures: HTTP ${resp.status}`, false); return; }
+    const data = await resp.json();
+
+    if (!data.incidents || data.incidents.length === 0) {
+      dbg('TomTom: no incidents in area', true);
+      _closuresLoaded = true;
+      return;
+    }
+
+    // Pre-process and store for card map reuse
+    _closureIncidents = data.incidents.map(inc => {
+      const props = inc.properties || {};
+      const geom = inc.geometry || {};
+      const coords = geom.coordinates || [];
+      const cat = props.iconCategory;
+      // Only keep roadworks (6,9) and closures (7,8) — no traffic/congestion
+      if (![6, 7, 8, 9].includes(cat)) return null;
+      if (coords.length === 0) return null;
+
+      const isClosure = cat === 7 || cat === 8;
+      const desc = (props.events && props.events[0] && props.events[0].description) || 'Road incident';
+      // Calculate midpoint for icon placement
+      const midIdx = Math.floor(coords.length / 2);
+      const midLon = coords[midIdx][0];
+      const midLat = coords[midIdx][1];
+
+      return {
+        ...inc,
+        _isClosure: isClosure,
+        _desc: desc,
+        _midLat: midLat,
+        _midLon: midLon,
+        _latLngs: coords.map(c => [c[1], c[0]]) // GeoJSON [lon,lat] → Leaflet [lat,lon]
+      };
+    }).filter(Boolean);
+
+    // Add icon markers: closures → always-visible layer, roadworks → toggleable layer
+    let closureCount = 0, roadworkCount = 0;
+    _closureIncidents.forEach(inc => {
+      const emoji = inc._isClosure ? '🚫' : '🚧';
+      const markerCls = inc._isClosure ? 'closure-marker-closure' : 'closure-marker-roadwork';
+      const size = 22;
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="closure-marker ${markerCls}" style="width:${size}px;height:${size}px">${emoji}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+      });
+
+      const marker = L.marker([inc._midLat, inc._midLon], { icon, interactive: true });
+      marker.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
+      marker.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
+
+      if (inc._isClosure) {
+        marker.addTo(masterClosureLayer);
+        closureCount++;
+      } else {
+        marker.addTo(masterRoadworkLayer);
+        roadworkCount++;
+      }
+    });
+
+    dbg(`TomTom: ${closureCount} closures + ${roadworkCount} roadworks loaded`, true);
+    _closuresLoaded = true;
+
+    // Process any card maps that opened before closure data was ready
+    if (_pendingClosureMaps.length > 0) {
+      _pendingClosureMaps.forEach(m => { try { addClosuresToCardMap(m); } catch(e) {} });
+      _pendingClosureMaps = [];
+    }
+  } catch (e) {
+    dbg(`Map closures failed: ${e.message}`, false);
+    _closuresLoaded = true; // mark loaded even on error to avoid retries
+  }
+}
+
+/** Add closure/roadworks lines to an individual route card map.
+ *  Only shows closures whose midpoint is within ~500m of the GPX route line. */
+function addClosuresToCardMap(map) {
+  if (!_closureIncidents || _closureIncidents.length === 0) {
+    // Data not ready yet — queue this map for later when closures load
+    if (!_closuresLoaded) _pendingClosureMaps.push(map);
+    return;
+  }
+
+  // Collect GPX route points from the map
+  const routePoints = [];
+  map.eachLayer(l => {
+    if (l instanceof L.GPX || (l instanceof L.FeatureGroup && l.getLayers)) {
+      (l.getLayers ? l.getLayers() : [l]).forEach(sub => {
+        if (sub.getLatLngs) {
+          const lls = sub.getLatLngs();
+          if (lls.length > 0 && lls[0] instanceof L.LatLng) {
+            lls.forEach(ll => routePoints.push(ll));
+          } else if (Array.isArray(lls[0])) {
+            lls.forEach(arr => arr.forEach(ll => routePoints.push(ll)));
+          }
+        }
+      });
+    }
+  });
+  if (routePoints.length === 0) return; // no route to compare against
+
+  // Sample route points every ~10th point for performance (routes can have 1000s of points)
+  const step = Math.max(1, Math.floor(routePoints.length / 200));
+  const sampled = routePoints.filter((_, i) => i % step === 0);
+
+  // Haversine distance in metres (fast approx)
+  function distM(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  const PROXIMITY_M = 500; // 500m from route
+  let added = 0;
+
+  _closureIncidents.forEach(inc => {
+    // Filter by closureMode: 'closures' = closures only, 'all' = closures + roadworks
+    if (state.closureMode === 'closures' && !inc._isClosure) return;
+
+    // Check if closure midpoint is within PROXIMITY_M of any sampled route point
+    const nearRoute = sampled.some(rp => distM(inc._midLat, inc._midLon, rp.lat, rp.lng) < PROXIMITY_M);
+    if (!nearRoute) return;
+
+    const colour = inc._isClosure ? '#dc2626' : '#f59e0b';
+    const emoji = inc._isClosure ? '🚫' : '🚧';
+
+    // Glow/outline layer underneath for visibility
+    const glow = L.polyline(inc._latLngs, {
+      color: '#000',
+      weight: 12,
+      opacity: 0.3,
+      lineCap: 'round',
+    });
+    glow._isClosureOverlay = true;
+    glow.addTo(map);
+
+    // Main coloured line on top — thick and bold
+    const line = L.polyline(inc._latLngs, {
+      color: colour,
+      weight: 7,
+      opacity: 0.95,
+      dashArray: inc._isClosure ? null : '10 6',
+      lineCap: 'round',
+    });
+
+    line.bindPopup(buildClosurePopup(inc), { maxWidth: 260 });
+    line.bindTooltip(`${emoji} ${escHtml(inc._desc)}`, { sticky: true });
+
+    line._isClosureOverlay = true;
+    line.on('mouseover', function() { this.setStyle({ weight: 10, opacity: 1 }); });
+    line.on('mouseout', function() { this.setStyle({ weight: 7, opacity: 0.95 }); });
+
+    line.addTo(map);
+    added++;
+  });
+
+  if (added > 0) dbg(`Card map: ${added} closures near route`, true);
+}
+
+function scrollToCard(slug) {
+  // Switch to list view first, then scroll after a beat
+  switchView('list');
+  setTimeout(() => {
+    const el = document.getElementById('route-' + slug);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('highlighted');
+    setTimeout(() => el.classList.remove('highlighted'), 3000);
+  }, 120);
+}
+
+// Expose on window so Leaflet popup onclick strings can reach them
+window.scrollToCard = scrollToCard;
+window.switchView   = switchView;
+
+async function init() {
+  initControls();
+  initFindMyRide();
+  initCompare();
+  // Show debug panel only if flag is set
+  if (CONFIG.SHOW_DEBUG) {
+    const dp = document.getElementById('debugPanel');
+    if (dp) dp.style.display = '';
+  }
+  dbg('App initialising...');
+  try {
+    // Fetch routes, cafes and weather in parallel
+    const [routes, cafes, weather] = await Promise.all([
+      fetchRoutes(),
+      fetchCafes(),
+      fetchWeather().catch(e => { dbg(`Weather failed: ${e.message}`, false); return null; }),
+    ]);
+    allRoutes = routes;
+    allCafes  = cafes;
+    weatherData = weather;
+
+    // Render weather strip + ride planner
+    renderWeatherStrip(weatherData);
+    renderRidePlanner(weatherData, allRoutes);
+
+    dbg(`init complete — ${allRoutes.length} routes, ${allCafes.length} cafes loaded`, allRoutes.length > 0);
+    applyFilters();
+
+    // Pre-fetch road closure data in background (needed for card maps even before Map view opens)
+    if (CONFIG.ROAD_CLOSURES_ENABLED && CONFIG.TOMTOM_API_KEY) {
+      loadMapClosures().catch(() => {});
+    }
+  } catch (err) {
+    dbg(`init failed: ${err.message}`, false);
+    console.error('Failed to load routes:', err);
+    document.getElementById('routesGrid').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Couldn't load routes</h3>
+        <p>Check the debug panel above for details.</p>
+      </div>`;
+  }
+}
+
+init();
+
