@@ -10,7 +10,7 @@ import { fetchWeather, renderWeatherStrip, renderRidePlanner, adjustPlannerDist,
 import { setMapRefs, loadMapClosures } from './closures.js';
 import { renderCards, setCardDeps } from './cards.js';
 import { refreshMasterMap, getMasterMap, getLeafletMaps, switchView, toggleMap, openMapForCard, shareRoute, checkHash, scrollToCard } from './map.js';
-import { applyFilters, initControls, resetFilters, populateRegionDropdown } from './filters.js';
+import { applyFilters, initControls, resetFilters, populateRegionDropdown, adjustFilterRanges } from './filters.js';
 import { initFindMyRide } from './find-my-ride.js';
 import { toggleCompare, initCompare } from './compare.js';
 
@@ -82,6 +82,7 @@ async function init() {
     setWeatherData(weather);
 
     populateRegionDropdown(allRoutes);
+    adjustFilterRanges(allRoutes);
     renderWeatherStrip(weather);
     renderRidePlanner(weather, allRoutes);
 

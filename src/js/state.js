@@ -20,7 +20,7 @@ export const state = {
   region: 'Cambridge Core',
   type: 'all',
   distMin: 0, distMax: 160,
-  ascentMin: 0, ascentMax: 2500,
+  ascentMin: 0, ascentMax: 4000,
   directions: new Set(['N','NE','E','SE','S','SW','W','NW']),
   mapDisplay: 'all',
   excludeBusway: false,

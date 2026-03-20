@@ -72,8 +72,13 @@ export function updateCounts() {
 
 export function resetFilters() {
   state.type = 'all';
-  state.distMin = 0; state.distMax = 160;
-  state.ascentMin = 0; state.ascentMax = 2500;
+  const distMaxSlider = document.getElementById('distMax');
+  const ascentMaxSlider = document.getElementById('ascentMax');
+  const distCeil = parseInt(distMaxSlider?.max) || 160;
+  const ascentCeil = parseInt(ascentMaxSlider?.max) || 4000;
+
+  state.distMin = 0; state.distMax = distCeil;
+  state.ascentMin = 0; state.ascentMax = ascentCeil;
   state.directions = new Set(['N','NE','E','SE','S','SW','W','NW']);
   state.mapDisplay = 'all';
   state.excludeBusway = false;
@@ -85,13 +90,13 @@ export function resetFilters() {
   if (masterMapInstance) masterMapInstance._userMoved = false;
 
   document.getElementById('distMin').value = 0;
-  document.getElementById('distMax').value = 160;
+  distMaxSlider.value = distCeil;
   document.getElementById('ascentMin').value = 0;
-  document.getElementById('ascentMax').value = 2500;
+  ascentMaxSlider.value = ascentCeil;
   document.getElementById('distMinVal').textContent = '0 mi';
-  document.getElementById('distMaxVal').textContent = '160 mi';
+  document.getElementById('distMaxVal').textContent = distCeil + ' mi';
   document.getElementById('ascentMinVal').textContent = '0 m';
-  document.getElementById('ascentMaxVal').textContent = '2500 m';
+  document.getElementById('ascentMaxVal').textContent = ascentCeil + ' m';
   document.getElementById('buswayToggle').checked = false;
   document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'closures'));
   updateClosureLayers();
@@ -186,6 +191,34 @@ export function loadPrefs() {
         b.classList.toggle('active', b.dataset.val === prefs.type));
     }
   } catch (e) { /* corrupt data — ignore */ }
+}
+
+export function adjustFilterRanges(routes) {
+  const maxDist = Math.ceil(Math.max(...routes.map(r => parseFloat(r.distance_miles) || 0)) / 10) * 10 || 160;
+  const maxAscent = Math.ceil(Math.max(...routes.map(r => parseFloat(r.ascent_metres) || 0)) / 100) * 100 || 4000;
+
+  const distMaxEl = document.getElementById('distMax');
+  const ascentMaxEl = document.getElementById('ascentMax');
+
+  if (distMaxEl) {
+    const oldMax = parseInt(distMaxEl.max);
+    distMaxEl.max = maxDist;
+    // If user hadn't manually lowered below the old max, track the new max
+    if (state.distMax >= oldMax) {
+      distMaxEl.value = maxDist;
+      state.distMax = maxDist;
+      document.getElementById('distMaxVal').textContent = maxDist + ' mi';
+    }
+  }
+  if (ascentMaxEl) {
+    const oldMax = parseInt(ascentMaxEl.max);
+    ascentMaxEl.max = maxAscent;
+    if (state.ascentMax >= oldMax) {
+      ascentMaxEl.value = maxAscent;
+      state.ascentMax = maxAscent;
+      document.getElementById('ascentMaxVal').textContent = maxAscent + ' m';
+    }
+  }
 }
 
 export function populateRegionDropdown(routes) {
