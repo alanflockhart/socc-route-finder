@@ -1,6 +1,6 @@
-// Hide debug panel immediately if SHOW_DEBUG is false — avoids flash of panel on load
-  // (CONFIG is defined later in the main script block, so we check a data attribute instead)
-  document.getElementById('debugPanel').dataset.managed = '1';
+// Mark debug panel as managed (used by main.js to control visibility)
+const debugEl = document.getElementById('debugPanel');
+if (debugEl) debugEl.dataset.managed = '1';
 
 /* ════════════════════════════════════════════════════════════════════
    CONFIG — All tuneable settings live here. See ADMIN_GUIDE.md for details.

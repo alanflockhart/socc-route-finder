@@ -76,9 +76,9 @@
       <div class="planner-controls">
         <span class="planner-control-label">Target distance</span>
         <div class="planner-slider-group">
-          <button class="stepper-btn" onclick="adjustPlannerDist(-5)" aria-label="Decrease distance by 5 miles">−</button>
+          <button class="stepper-btn" data-planner-step="-5" aria-label="Decrease distance by 5 miles">−</button>
           <input type="range" class="planner-slider" id="plannerDist" min="10" max="130" value="40" step="5">
-          <button class="stepper-btn" onclick="adjustPlannerDist(5)" aria-label="Increase distance by 5 miles">+</button>
+          <button class="stepper-btn" data-planner-step="5" aria-label="Increase distance by 5 miles">+</button>
         </div>
         <span class="planner-slider-val" id="plannerDistVal">40 mi</span>
       </div>
@@ -171,7 +171,7 @@
   <div style="max-width:1280px;margin:0 auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">
       <strong style="color:#2CBCB3;font-size:0.85rem;">🔧 Debug Panel — remove once working</strong>
-      <button onclick="document.getElementById('debugPanel').remove()" style="background:rgba(255,255,255,0.1);border:none;color:white;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.75rem">✕ Hide</button>
+      <button id="debugHideBtn" style="background:rgba(255,255,255,0.1);border:none;color:white;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.75rem">✕ Hide</button>
     </div>
     <div id="debugLog" style="display:flex;flex-direction:column;gap:0.3rem;"></div>
   </div>
@@ -219,16 +219,16 @@
           <div class="range-group">
             <div class="range-row">
               <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Min</span>
-              <button class="stepper-btn" onclick="adjustRange('distMin', -1)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
+              <button class="stepper-btn" data-range-id="distMin" data-range-step="-1" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="distMin" min="0" max="160" value="0" step="1">
-              <button class="stepper-btn" onclick="adjustRange('distMin', 1)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
+              <button class="stepper-btn" data-range-id="distMin" data-range-step="1" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
               <span class="range-val" id="distMinVal">0 mi</span>
             </div>
             <div class="range-row">
               <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Max</span>
-              <button class="stepper-btn" onclick="adjustRange('distMax', -5)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
+              <button class="stepper-btn" data-range-id="distMax" data-range-step="-5" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="distMax" min="0" max="160" value="160" step="5">
-              <button class="stepper-btn" onclick="adjustRange('distMax', 5)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
+              <button class="stepper-btn" data-range-id="distMax" data-range-step="5" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
               <span class="range-val" id="distMaxVal">160 mi</span>
             </div>
           </div>
@@ -240,16 +240,16 @@
           <div class="range-group">
             <div class="range-row">
               <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Min</span>
-              <button class="stepper-btn" onclick="adjustRange('ascentMin', -50)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
+              <button class="stepper-btn" data-range-id="ascentMin" data-range-step="-50" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="ascentMin" min="0" max="1000" value="0" step="10">
-              <button class="stepper-btn" onclick="adjustRange('ascentMin', 50)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
+              <button class="stepper-btn" data-range-id="ascentMin" data-range-step="50" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
               <span class="range-val" id="ascentMinVal">0 m</span>
             </div>
             <div class="range-row">
               <span style="font-size:0.7rem;color:var(--grey-400);width:24px;flex-shrink:0">Max</span>
-              <button class="stepper-btn" onclick="adjustRange('ascentMax', -100)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
+              <button class="stepper-btn" data-range-id="ascentMax" data-range-step="-100" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">−</button>
               <input type="range" id="ascentMax" min="0" max="2500" value="2500" step="25">
-              <button class="stepper-btn" onclick="adjustRange('ascentMax', 100)" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
+              <button class="stepper-btn" data-range-id="ascentMax" data-range-step="100" style="width:24px;height:24px;font-size:0.9rem;flex-shrink:0">+</button>
               <span class="range-val" id="ascentMaxVal">2500 m</span>
             </div>
           </div>
@@ -311,7 +311,7 @@
         </div>
 
         <button class="reset-btn" id="resetBtn">↺ Reset all filters</button>
-        <button class="reset-btn" onclick="clearCache()" style="margin-top:0.4rem;font-size:0.72rem;">
+        <button class="reset-btn" id="refreshDataBtn" style="margin-top:0.4rem;font-size:0.72rem;">
           🔄 Refresh route data
         </button>
         <div id="cacheAge" style="font-size:0.68rem;color:var(--grey-400);text-align:center;margin-top:0.4rem;"></div>
@@ -324,14 +324,14 @@
 
     <!-- Mobile quick actions (visible only on small screens) -->
     <div class="mobile-quick-actions">
-      <button class="quick-btn" onclick="resetFilters()">↺ Reset filters</button>
-      <button class="quick-btn" onclick="clearCache()">🔄 Refresh data</button>
+      <button class="quick-btn" id="mobileResetBtn">↺ Reset filters</button>
+      <button class="quick-btn" id="mobileRefreshBtn">🔄 Refresh data</button>
     </div>
 
     <!-- View toggle tabs -->
     <div class="view-tabs">
-      <button class="view-tab active" id="tabList" onclick="switchView('list')">📋 List</button>
-      <button class="view-tab"        id="tabMap"  onclick="switchView('map')">🗺️ Map</button>
+      <button class="view-tab active" id="tabList" data-view="list">📋 List</button>
+      <button class="view-tab"        id="tabMap"  data-view="map">🗺️ Map</button>
     </div>
 
     <!-- List view -->
