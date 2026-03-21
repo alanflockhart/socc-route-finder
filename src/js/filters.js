@@ -291,6 +291,8 @@ export function initControls() {
 
     savePrefs();
     applyFilters();
+    // Region switch needs full GPX reload on map view
+    refreshMasterMap();
   });
 
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(btn => {
