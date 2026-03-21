@@ -384,7 +384,7 @@ export async function refreshMasterMap() {
       requestAnimationFrame(() => { clearTimeout(timeout); setTimeout(resolve, 50); });
     });
     try {
-      masterMapInstance = L.map(mapEl).setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+      masterMapInstance = L.map(mapEl).setView([SWAVESEY.lat, SWAVESEY.lon], 9);
     } catch (e) {
       console.error('Map init error:', e.message);
       return;
@@ -448,7 +448,7 @@ export async function refreshMasterMap() {
   }
 
   if (filteredRoutes.length === 0) {
-    masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 9);
     return;
   }
 
@@ -504,7 +504,7 @@ export async function refreshMasterMap() {
     const isDefaultView = isLocalRegion && state.type === 'all' && state.distMin === 0 && state.distMax >= 160;
     masterMapInstance._programmaticMove = true;
     if (isDefaultView) {
-      masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+      masterMapInstance.setView([SWAVESEY.lat, SWAVESEY.lon], 9);
     } else if (bounds.length > 0) {
       masterMapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
     }
