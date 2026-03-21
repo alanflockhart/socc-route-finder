@@ -329,7 +329,7 @@ export function initControls() {
       document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.mapDisplay = btn.dataset.val;
-      applyFilters();
+      refreshMasterMap(); // full refresh including GPX tracks
     });
   });
 
