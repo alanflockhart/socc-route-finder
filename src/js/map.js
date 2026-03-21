@@ -373,7 +373,7 @@ function buildRoutePopupHtml(route, slug) {
 }
 
 /* ── Master map ── */
-export async function refreshMasterMap() {
+export async function refreshMasterMap({ skipGpx = false } = {}) {
   if (currentView !== 'map') return;
 
   const mapEl = document.getElementById('masterMap');
@@ -470,7 +470,7 @@ export async function refreshMasterMap() {
     const gpxColour = GPX_PALETTE[idx % GPX_PALETTE.length];
     const gpxDash = GPX_DASHES[Math.floor(idx / GPX_PALETTE.length) % GPX_DASHES.length];
 
-    if (safe(route.gpx_url)) {
+    if (!skipGpx && safe(route.gpx_url)) {
       new L.GPX(safe(route.gpx_url), {
         async: true,
         polyline_options: { color: gpxColour, opacity: 0.7, weight: 4, dashArray: gpxDash },

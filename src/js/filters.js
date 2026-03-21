@@ -37,7 +37,7 @@ export function applyFilters() {
   setFilteredRoutes(filtered);
 
   dbg(`After filters: ${filteredRoutes.length} of ${allRoutes.length} routes visible`);
-  refreshMasterMap();
+  refreshMasterMap({ skipGpx: true });
 
   filteredRoutes.sort((a, b) => {
     if (state.sort === 'fmr_score')  return (b.fmrScore||0) - (a.fmrScore||0);
