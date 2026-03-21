@@ -6,11 +6,11 @@ Everything you need to maintain, configure, and extend the app.
 
 ## Architecture Overview
 
-The entire application is a **single HTML file** (`index.html`) — all CSS and JavaScript are inline. There is no build step, no backend server, and no database.
+The application uses a **Vite-based build pipeline** with source files in `src/` and a production build output in `dist/`. There is no backend server and no database.
 
 | Component | Technology | Notes |
 |-----------|-----------|-------|
-| Frontend | Single `index.html` | All HTML + CSS + JS inline |
+| Frontend | Vite + vanilla JS | Source in `src/`, built to `dist/` |
 | Route data | Google Sheets → CSV | Auto-fetched on page load, cached 1 hour |
 | Maps | Leaflet.js 1.9.4 | OpenStreetMap tiles (free, no key) |
 | GPX tracks | leaflet-gpx 1.7.0 | Renders route overlays on maps |
@@ -194,8 +194,8 @@ The app is hosted on **Netlify** (free tier). It deploys automatically from the 
 |---------|-------|
 | Repository | `github.com/alanflockhart/socc-route-finder` |
 | Production branch | `master` |
-| Build command | None — no build step needed |
-| Publish directory | `/` (root) |
+| Build command | `npm run build` |
+| Publish directory | `dist/` |
 
 ### Deploying Changes
 
@@ -206,13 +206,23 @@ The app is hosted on **Netlify** (free tier). It deploys automatically from the 
 
 ## Local Development
 
-The app must be served over HTTP — `file://` blocks `fetch()` and map tiles.
+The project uses **Vite** as its dev server and build tool.
 
 ```bash
-# Python (most systems)
-python3 -m http.server 8080
+# First time — install dependencies
+npm install
 
-# Then open http://localhost:8080
+# Start the dev server (port 3000, with hot reload)
+npm run dev
+
+# Run unit tests (Vitest)
+npm test
+
+# Run end-to-end tests (Playwright)
+npm run test:e2e
+
+# Production build (outputs to dist/)
+npm run build
 ```
 
 ### Development Mode
@@ -251,7 +261,7 @@ These are defined in the JavaScript but outside CONFIG. Change with care.
 ## Future Considerations
 
 - **Adding new external APIs** — the architecture supports it. Follow the existing pattern: fetch → cache → render. Add a CONFIG toggle so it can be disabled.
-- **Splitting the file** — the single-file approach is intentional (simple hosting, no build step). Only split if the file becomes genuinely hard to navigate (currently ~4,900 lines).
+- **Module structure** — source code lives in `src/` with a Vite build pipeline. Keep modules focused and reasonably sized.
 - **New route types** — add a new type value in the Google Sheet (e.g. `Gravel`). The app dynamically creates filter buttons from the data — no code change needed.
 - **Moving the HQ** — update the `SWAVESEY` constant and the weather API coordinates in `fetchWeather()`.
 - **Replacing TomTom** — if the free tier runs out, set `ROAD_CLOSURES_ENABLED: false` to disable it cleanly. The rest of the app is unaffected.
