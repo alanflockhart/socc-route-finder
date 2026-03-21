@@ -228,7 +228,8 @@ export function renderRidePlannerForDay(dayData) {
   }
 
   const targetDist = state.targetDistance || 40;
-  const scored = scoreSundayRoutes(allRoutes, weatherData, targetDist, dayData);
+  const coreRoutes = allRoutes.filter(r => !r.region || r.region === 'Cambridge Core');
+  const scored = scoreSundayRoutes(coreRoutes, weatherData, targetDist, dayData);
   renderPickCards(scored.slice(0, 3), picksContainer);
 }
 
@@ -365,7 +366,8 @@ export function renderRidePlanner(weather, routes) {
       if (valEl) valEl.textContent = state.targetDistance + ' mi';
       savePrefs();
       const dayWeather = getSelectedDayWeather();
-      const scored2 = scoreSundayRoutes(allRoutes, weatherData, state.targetDistance, dayWeather);
+      const coreRoutes = allRoutes.filter(r => !r.region || r.region === 'Cambridge Core');
+      const scored2 = scoreSundayRoutes(coreRoutes, weatherData, state.targetDistance, dayWeather);
       renderPickCards(scored2.slice(0, 3), document.getElementById('plannerPicks'));
     });
   }

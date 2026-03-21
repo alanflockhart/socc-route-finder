@@ -84,7 +84,7 @@ async function init() {
     populateRegionDropdown(allRoutes);
     adjustFilterRanges(allRoutes);
     renderWeatherStrip(weather);
-    renderRidePlanner(weather, allRoutes);
+    renderRidePlanner(weather, allRoutes.filter(r => !r.region || r.region === 'Cambridge Core'));
 
     dbg(`init complete — ${allRoutes.length} routes, ${allCafes.length} cafes loaded`, allRoutes.length > 0);
     applyFilters();
