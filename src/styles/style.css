@@ -335,6 +335,73 @@
       cursor: pointer;
     }
 
+    /* Compass rose direction filter */
+    .compass-rose {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      margin: 0.5rem auto 0.25rem;
+    }
+    .compass-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 90px; height: 90px;
+      transform: translate(-50%, -50%);
+      border: 1.5px solid var(--grey-200);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .compass-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 6px; height: 6px;
+      transform: translate(-50%, -50%);
+      background: var(--grey-300);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .compass-point {
+      position: absolute;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 2px solid var(--grey-300);
+      background: white;
+      color: var(--grey-400);
+      font-size: 0.65rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+    }
+    .compass-point:hover {
+      border-color: var(--teal);
+      color: var(--teal);
+    }
+    .compass-point[aria-pressed="true"] {
+      background: var(--teal);
+      border-color: var(--teal);
+      color: white;
+      box-shadow: 0 1px 4px rgba(44,188,179,0.3);
+    }
+    .compass-point[aria-pressed="true"]:hover {
+      background: var(--teal-dark);
+      border-color: var(--teal-dark);
+    }
+    /* Cardinal points — on the ring */
+    .cp-n  { top: 6%;   left: 50%; }
+    .cp-e  { top: 50%;  left: 94%; }
+    .cp-s  { top: 94%;  left: 50%; }
+    .cp-w  { top: 50%;  left: 6%;  }
+    /* Ordinal points — slightly outside the ring */
+    .cp-ne { top: 14%;  left: 86%; }
+    .cp-se { top: 86%;  left: 86%; }
+    .cp-sw { top: 86%;  left: 14%; }
+    .cp-nw { top: 14%;  left: 14%; }
+
     /* Switch toggles */
     .switch-row {
       display: flex;

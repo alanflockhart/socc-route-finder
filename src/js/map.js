@@ -373,14 +373,22 @@ function buildRoutePopupHtml(route, slug) {
 }
 
 /* ── Master map ── */
-export async function refreshMasterMap({ skipGpx = false } = {}) {
+export async function refreshMasterMap() {
   if (currentView !== 'map') return;
 
   const mapEl = document.getElementById('masterMap');
 
   if (!masterMapInstance) {
-    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
-    masterMapInstance = L.map(mapEl).setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    await new Promise(resolve => {
+      const timeout = setTimeout(resolve, 200);
+      requestAnimationFrame(() => { clearTimeout(timeout); setTimeout(resolve, 50); });
+    });
+    try {
+      masterMapInstance = L.map(mapEl).setView([SWAVESEY.lat, SWAVESEY.lon], 10);
+    } catch (e) {
+      console.error('Map init error:', e.message);
+      return;
+    }
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 18,
@@ -470,7 +478,7 @@ export async function refreshMasterMap({ skipGpx = false } = {}) {
     const gpxColour = GPX_PALETTE[idx % GPX_PALETTE.length];
     const gpxDash = GPX_DASHES[Math.floor(idx / GPX_PALETTE.length) % GPX_DASHES.length];
 
-    if (!skipGpx && safe(route.gpx_url)) {
+    if (safe(route.gpx_url)) {
       new L.GPX(safe(route.gpx_url), {
         async: true,
         polyline_options: { color: gpxColour, opacity: 0.7, weight: 4, dashArray: gpxDash },

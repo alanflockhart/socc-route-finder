@@ -258,15 +258,17 @@
         <!-- Direction -->
         <div class="filter-group">
           <span class="filter-label">Direction</span>
-          <div class="checkbox-grid checkbox-grid-4col" id="dirChecks">
-            <label class="check-item"><input type="checkbox" value="N" checked> N</label>
-            <label class="check-item"><input type="checkbox" value="NE" checked> NE</label>
-            <label class="check-item"><input type="checkbox" value="E" checked> E</label>
-            <label class="check-item"><input type="checkbox" value="SE" checked> SE</label>
-            <label class="check-item"><input type="checkbox" value="S" checked> S</label>
-            <label class="check-item"><input type="checkbox" value="SW" checked> SW</label>
-            <label class="check-item"><input type="checkbox" value="W" checked> W</label>
-            <label class="check-item"><input type="checkbox" value="NW" checked> NW</label>
+          <div class="compass-rose" id="dirChecks">
+            <div class="compass-ring"></div>
+            <button class="compass-point cp-n"  data-dir="N"  aria-label="North"     aria-pressed="true">N</button>
+            <button class="compass-point cp-ne" data-dir="NE" aria-label="Northeast"  aria-pressed="true">NE</button>
+            <button class="compass-point cp-e"  data-dir="E"  aria-label="East"       aria-pressed="true">E</button>
+            <button class="compass-point cp-se" data-dir="SE" aria-label="Southeast"  aria-pressed="true">SE</button>
+            <button class="compass-point cp-s"  data-dir="S"  aria-label="South"      aria-pressed="true">S</button>
+            <button class="compass-point cp-sw" data-dir="SW" aria-label="Southwest"  aria-pressed="true">SW</button>
+            <button class="compass-point cp-w"  data-dir="W"  aria-label="West"       aria-pressed="true">W</button>
+            <button class="compass-point cp-nw" data-dir="NW" aria-label="Northwest"  aria-pressed="true">NW</button>
+            <div class="compass-center"></div>
           </div>
         </div>
 

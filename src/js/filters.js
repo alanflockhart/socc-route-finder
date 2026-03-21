@@ -37,7 +37,7 @@ export function applyFilters() {
   setFilteredRoutes(filtered);
 
   dbg(`After filters: ${filteredRoutes.length} of ${allRoutes.length} routes visible`);
-  refreshMasterMap({ skipGpx: true });
+  refreshMasterMap();
 
   filteredRoutes.sort((a, b) => {
     if (state.sort === 'fmr_score')  return (b.fmrScore||0) - (a.fmrScore||0);
@@ -100,7 +100,7 @@ export function resetFilters() {
   document.getElementById('buswayToggle').checked = false;
   document.querySelectorAll('#closureModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'closures'));
   updateClosureLayers();
-  document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => cb.checked = true);
+  document.querySelectorAll('#dirChecks .compass-point').forEach(btn => btn.setAttribute('aria-pressed', 'true'));
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
   document.querySelectorAll('#mapDisplayToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'all'));
 
@@ -168,8 +168,8 @@ export function loadPrefs() {
       const dirs = prefs.directions.filter(d => valid.includes(d));
       if (dirs.length > 0) {
         state.directions = new Set(dirs);
-        document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
-          cb.checked = dirs.includes(cb.value);
+        document.querySelectorAll('#dirChecks .compass-point').forEach(btn => {
+          btn.setAttribute('aria-pressed', String(dirs.includes(btn.dataset.dir)));
         });
       }
     }
@@ -291,8 +291,6 @@ export function initControls() {
 
     savePrefs();
     applyFilters();
-    // Region switch needs full GPX reload on map view
-    refreshMasterMap();
   });
 
   document.querySelectorAll('#typeToggle .toggle-btn').forEach(btn => {
@@ -317,10 +315,12 @@ export function initControls() {
     });
   });
 
-  document.querySelectorAll('#dirChecks input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const checked = [...document.querySelectorAll('#dirChecks input:checked')].map(c => c.value);
-      state.directions = new Set(checked);
+  document.querySelectorAll('#dirChecks .compass-point').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pressed = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!pressed));
+      const active = [...document.querySelectorAll('#dirChecks .compass-point[aria-pressed="true"]')].map(b => b.dataset.dir);
+      state.directions = new Set(active);
       savePrefs();
       debouncedFilter();
     });
