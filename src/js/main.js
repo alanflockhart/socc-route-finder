@@ -56,6 +56,17 @@ document.querySelectorAll('[data-view]').forEach(btn => {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
 
+// Mobile: close sidebar when tapping outside it
+document.addEventListener('click', (e) => {
+  const sidebarBody = document.getElementById('sidebarBody');
+  const filterToggle = document.getElementById('filterToggle');
+  if (sidebarBody?.classList.contains('open') &&
+      !sidebarBody.contains(e.target) &&
+      !filterToggle?.contains(e.target)) {
+    sidebarBody.classList.remove('open');
+  }
+});
+
 /* ── Init ────────────────────────────────────────────────────────── */
 async function init() {
   initControls();

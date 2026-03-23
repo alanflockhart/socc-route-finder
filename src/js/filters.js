@@ -58,6 +58,20 @@ function debouncedFilter() {
   setFilterTimer(setTimeout(applyFilters, 120));
 }
 
+function countActiveFilters() {
+  let count = 0;
+  if (state.type !== 'all') count++;
+  if (state.distMin > 0) count++;
+  const distMaxEl = document.getElementById('distMax');
+  if (distMaxEl && state.distMax < parseInt(distMaxEl.max)) count++;
+  if (state.ascentMin > 0) count++;
+  const ascentMaxEl = document.getElementById('ascentMax');
+  if (ascentMaxEl && state.ascentMax < parseInt(ascentMaxEl.max)) count++;
+  if (state.directions.size < 8) count++;
+  if (state.excludeBusway) count++;
+  return count;
+}
+
 export function updateCounts() {
   const total = allRoutes.length;
   const shown = filteredRoutes.length;
@@ -68,6 +82,13 @@ export function updateCounts() {
   if (mtbEl) mtbEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'mtb').length;
   const gravelEl = document.getElementById('hero-gravel');
   if (gravelEl) gravelEl.textContent = allRoutes.filter(r => safe(r.type).toLowerCase() === 'gravel').length;
+
+  const activeCount = countActiveFilters();
+  const badge = document.getElementById('activeFilterCount');
+  if (badge) {
+    badge.textContent = activeCount;
+    badge.style.display = activeCount > 0 ? '' : 'none';
+  }
 }
 
 export function resetFilters() {

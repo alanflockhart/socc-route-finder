@@ -46,8 +46,16 @@ export function initFindMyRide() {
   });
 
   searchBtn.addEventListener('click', () => {
+    searchBtn.disabled = true;
+    const originalText = searchBtn.textContent;
+    searchBtn.textContent = 'Scoring…';
     const prefs = getFindMyRidePrefs();
-    applyFindMyRide(prefs);
+    // Defer scoring by one frame so the button state renders before the work begins
+    requestAnimationFrame(() => {
+      applyFindMyRide(prefs);
+      searchBtn.disabled = false;
+      searchBtn.textContent = originalText;
+    });
   });
 
   resetBtn.addEventListener('click', () => {

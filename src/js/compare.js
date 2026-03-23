@@ -9,11 +9,28 @@ import { getSelectedDayWeather, windAlignmentScore, windLabel } from './weather.
 const compareSet = new Set();
 const COMPARE_COLORS = ['#2CBCB3', '#f59e0b', '#8b5cf6'];
 
+function showToast(msg) {
+  const existing = document.getElementById('socc-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'socc-toast';
+  toast.textContent = msg;
+  toast.style.cssText = 'position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:0.6rem 1.2rem;border-radius:2rem;font-size:0.85rem;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:1;transition:opacity 0.3s ease';
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
 export function toggleCompare(slug) {
   if (compareSet.has(slug)) {
     compareSet.delete(slug);
   } else {
-    if (compareSet.size >= 3) return;
+    if (compareSet.size >= 3) {
+      showToast('Comparison is limited to 3 routes');
+      return;
+    }
     compareSet.add(slug);
   }
   updateCompareUI();
@@ -161,17 +178,9 @@ function loadCompareElevations(routes) {
   const canvas = document.getElementById('compareElevChart');
   if (!canvas || typeof Chart === 'undefined') return;
 
-  const datasets = [];
-  let loaded = 0;
-
-  routes.forEach((route, i) => {
-    if (!route.gpx_url) {
-      loaded++;
-      if (loaded === routes.length) renderCompareChart(canvas, datasets);
-      return;
-    }
-
-    fetch(route.gpx_url)
+  const fetchElevation = (route, i) => {
+    if (!route.gpx_url) return Promise.resolve(null);
+    return fetch(route.gpx_url)
       .then(r => r.text())
       .then(gpxText => {
         const parser = new DOMParser();
@@ -182,24 +191,23 @@ function loadCompareElevations(routes) {
           const ele = pt.querySelector('ele');
           if (ele) elevations.push(parseFloat(ele.textContent));
         });
-
-        if (elevations.length > 0) {
-          const sampled = downsample(elevations, 100);
-          datasets.push({
-            label: safe(route.route_name),
-            data: sampled,
-            borderColor: COMPARE_COLORS[i % COMPARE_COLORS.length],
-            backgroundColor: COMPARE_COLORS[i % COMPARE_COLORS.length] + '20',
-            fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
-          });
-        }
+        if (elevations.length === 0) return null;
+        return {
+          label: safe(route.route_name),
+          data: downsample(elevations, 100),
+          borderColor: COMPARE_COLORS[i % COMPARE_COLORS.length],
+          backgroundColor: COMPARE_COLORS[i % COMPARE_COLORS.length] + '20',
+          fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+        };
       })
-      .catch(() => {})
-      .finally(() => {
-        loaded++;
-        if (loaded === routes.length) renderCompareChart(canvas, datasets);
-      });
-  });
+      .catch(() => null);
+  };
+
+  Promise.all(routes.map((route, i) => fetchElevation(route, i)))
+    .then(results => {
+      const datasets = results.filter(Boolean);
+      renderCompareChart(canvas, datasets);
+    });
 }
 
 function downsample(arr, targetLen) {
