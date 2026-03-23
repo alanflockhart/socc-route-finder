@@ -25,6 +25,7 @@ src/
       utils.test.js            -- Unit tests for utility functions
       filters.test.js          -- Unit tests for filter logic
       weather.test.js          -- Unit tests for weather module
+      state.test.js            -- Unit tests for savePrefs / state persistence
 e2e/
   app.spec.js                  -- Playwright E2E tests (app load, navigation, interactions)
 gpx/                           -- GPX track files for route overlays on maps
@@ -84,13 +85,13 @@ The app is split into 11 ES modules under `src/js/`. The orchestrator (`main.js`
 | `state.js` | Shared mutable state (`allRoutes`, `filteredRoutes`, `allCafes`, `weatherData`, filter `state` object, user prefs persistence) |
 | `utils.js` | Pure helpers: `escHtml()`, `safe()`, `safeNum()`, `normaliseDir()`, `slugify()`, `normaliseGpxUrl()`, badge helpers |
 | `api.js` | Fetches routes and cafes from Google Sheets CSV, manages localStorage cache (1hr TTL), `dbg()` logger, `parseCSV()` |
-| `filters.js` | `applyFilters()` pipeline, `initControls()` for sidebar inputs, region dropdown, range adjusters, debounced filtering |
+| `filters.js` | `applyFilters()` pipeline, `initControls()` for sidebar inputs, region dropdown, range adjusters, debounced filtering, active filter count badge |
 | `map.js` | Master map and per-card maps, GPX track rendering, circle markers, cafe markers, popups, view switching, hash-based deep links |
 | `cards.js` | Renders the route card grid from `filteredRoutes`, expandable cards with stats, badges, wind alignment |
 | `weather.js` | Open-Meteo 7-day forecast, weather strip rendering, ride planner widget, wind alignment scoring |
 | `closures.js` | TomTom Traffic API integration, closure/roadwork overlays on master and card maps |
-| `compare.js` | Route comparison panel (up to 3 routes), side-by-side stats, overlaid elevation charts |
-| `find-my-ride.js` | Smart scoring engine: distance/time/wind preferences, scores and ranks routes |
+| `compare.js` | Route comparison panel (up to 3 routes), side-by-side stats, overlaid elevation charts (parallel GPX fetch), toast when limit reached |
+| `find-my-ride.js` | Smart scoring engine: distance/time/wind preferences, scores and ranks routes, loading state during scoring |
 
 ### Lazy-Dependency Wiring Pattern
 
@@ -136,7 +137,7 @@ npm test              # Run all unit tests once
 npm run test:watch    # Watch mode for development
 ```
 
-Tests live in `src/js/__tests__/` and cover `utils.js`, `filters.js`, and `weather.js`. Uses jsdom for DOM simulation.
+Tests live in `src/js/__tests__/` and cover `utils.js`, `filters.js`, `weather.js`, and `state.js` (savePrefs persistence). Uses jsdom for DOM simulation where modules access the DOM at load time.
 
 ### E2E Tests (Playwright)
 
@@ -144,7 +145,7 @@ Tests live in `src/js/__tests__/` and cover `utils.js`, `filters.js`, and `weath
 npm run test:e2e      # Run Playwright tests (auto-starts dev server)
 ```
 
-Tests live in `e2e/app.spec.js`. Runs against Chromium with the Vite dev server auto-started on port 3000. Configured with 30s timeout, 1 retry, and trace-on-first-retry.
+Tests live in `e2e/app.spec.js`. Runs against Chromium with the Vite dev server auto-started on port 3000. Configured with 30s timeout, 1 retry, and trace-on-first-retry. Covers: page load, cards, region/type/distance filters, map tab, weather strip, Find My Ride, comparison modal, comparison limit toast, empty state, filter count badge, card map toggle.
 
 ### Functional Testing Practices
 

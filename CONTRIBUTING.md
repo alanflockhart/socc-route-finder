@@ -99,13 +99,13 @@ If you add a new function that needs to be called from dynamic HTML, assign it t
 | `state.js` | Shared mutable state containers (`allRoutes`, `filteredRoutes`, `weatherData`, etc.) and their setters |
 | `utils.js` | Pure utility functions: `escHtml()`, `safe()`, `safeNum()`, `normaliseDir()`, `slugify()` |
 | `api.js` | Fetches route and cafe data from Google Sheets CSV, manages localStorage cache, debug logging |
-| `filters.js` | Filter controls (distance, ascent, direction, region, type), sorting, and `applyFilters()` orchestration |
+| `filters.js` | Filter controls (distance, ascent, direction, region, type), sorting, `applyFilters()` orchestration, and active filter count badge |
 | `cards.js` | Renders the route card grid, card expand/collapse, per-card map and elevation chart |
 | `map.js` | Master overview map, per-card Leaflet maps, GPX track rendering, marker layers, view switching |
 | `weather.js` | Open-Meteo API integration, weather strip, ride planner, wind alignment scoring |
 | `closures.js` | TomTom Traffic API integration, road closure/roadwork overlays on maps |
-| `compare.js` | Side-by-side route comparison panel (up to 3 routes) |
-| `find-my-ride.js` | Smart scoring engine that recommends routes based on distance, time, and weather preferences |
+| `compare.js` | Side-by-side route comparison panel (up to 3 routes); shows toast when limit reached; GPX elevation profiles fetched in parallel |
+| `find-my-ride.js` | Smart scoring engine that recommends routes based on distance, time, and weather preferences; shows loading state during scoring |
 
 ---
 
@@ -166,6 +166,7 @@ Tests live in `src/js/__tests__/`. Current test files:
 - `utils.test.js` -- pure utility functions
 - `filters.test.js` -- filter and sort logic
 - `weather.test.js` -- weather data processing
+- `state.test.js` -- savePrefs serialisation and state persistence (uses `// @vitest-environment jsdom` since state.js imports config.js which accesses the DOM at load time)
 
 **Adding a new unit test:** Create `src/js/__tests__/<module>.test.js`. Vitest auto-discovers files matching `*.test.js`. Import functions directly from the module under test.
 
