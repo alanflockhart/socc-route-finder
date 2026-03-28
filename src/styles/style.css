@@ -116,6 +116,11 @@
       text-transform: uppercase;
       font-weight: 500;
     }
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
     .header-tag {
       background: rgba(44,188,179,0.15);
       color: var(--teal-light);
@@ -126,6 +131,13 @@
       padding: 0.3rem 0.75rem;
       border-radius: 20px;
       border: 1px solid rgba(44,188,179,0.3);
+      transition: var(--transition);
+    }
+    a.header-tag:hover { background: rgba(44,188,179,0.25); }
+    .header-tag.active {
+      background: var(--teal);
+      color: white;
+      border-color: var(--teal);
     }
 
     /* ─── HERO BANNER ────────────────────────────────────────────── */

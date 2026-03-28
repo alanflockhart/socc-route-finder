@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Route Analyser — SOCC</title>
+
+  <!-- Google Fonts — Inter for clean modern typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+
+  <style>
+    /* ─── DESIGN TOKENS ─────────────────────────────────────────── */
+    :root {
+      --dark:       #1B2631;
+      --dark-light: #243447;
+      --dark-deep:  #111B24;
+      --teal:       #2CBCB3;
+      --teal-light: #45D4CB;
+      --teal-dark:  #1A9E96;
+      --teal-dim:   rgba(44,188,179,0.10);
+      --teal-glow:  rgba(44,188,179,0.25);
+      --navy:       var(--dark);
+      --orange:     var(--teal);
+      --white:      #ffffff;
+      --grey-50:    #f7f9fa;
+      --grey-100:   #eef1f5;
+      --grey-200:   #dce1e9;
+      --grey-400:   #8c97a8;
+      --grey-600:   #4e5d6e;
+      --grey-800:   #2a3440;
+      --green:      #10b981;
+      --amber:      #f59e0b;
+      --red:        #ef4444;
+      --blue:       #3b82f6;
+      --surface:    #ffffff;
+      --font-main:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --font-mono:  'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      --radius:     12px;
+      --radius-sm:  8px;
+      --radius-xs:  4px;
+      --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --shadow:     0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+      --shadow-lg:  0 10px 30px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06);
+      --transition: 0.2s ease;
+      --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ─── RESET ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-main);
+      background: var(--grey-50);
+      color: var(--grey-800);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+
+    /* ─── HEADER ─────────────────────────────────────────────────── */
+    .site-header {
+      background: var(--dark-deep);
+      padding: 0 1.5rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 2px solid var(--teal);
+      backdrop-filter: blur(10px);
+    }
+    .site-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .site-header .logo-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(44,188,179,0.3);
+    }
+    .site-header .logo-icon svg { width: 20px; height: 20px; fill: white; }
+    .brand-name { font-size: 1.05rem; font-weight: 800; color: white; letter-spacing: 0.02em; }
+    .brand-sub { font-size: 0.65rem; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .header-tag {
+      background: rgba(44,188,179,0.15);
+      color: var(--teal-light);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      border: 1px solid rgba(44,188,179,0.3);
+      transition: var(--transition);
+    }
+    a.header-tag:hover { background: rgba(44,188,179,0.25); }
+    .header-tag.active {
+      background: var(--teal);
+      color: white;
+      border-color: var(--teal);
+    }
+
+    /* ─── HERO ──────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 50%, #1a3a4a 100%);
+      padding: 2rem 1.5rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -80px;
+      width: 320px; height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(44,188,179,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-inner { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+    .hero h1 { font-size: clamp(1.3rem, 3.5vw, 2rem); color: white; font-weight: 900; line-height: 1.15; letter-spacing: -0.03em; }
+    .hero h1 span { color: var(--teal-light); }
+    .hero-sub { margin-top: 0.4rem; color: rgba(255,255,255,0.55); font-size: 0.85rem; }
+
+    /* ─── MAIN CONTENT ──────────────────────────────────────────── */
+    .app-body {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      flex: 1;
+    }
+
+    /* ─── INPUT SECTION ─────────────────────────────────────────── */
+    .input-section {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .input-section h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+
+    .input-methods {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--grey-200);
+      border-radius: var(--radius);
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--grey-50);
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--teal);
+      background: var(--teal-dim);
+    }
+    .drop-zone-icon { font-size: 2rem; }
+    .drop-zone-text { font-size: 0.85rem; color: var(--grey-600); }
+    .drop-zone-hint { font-size: 0.72rem; color: var(--grey-400); }
+    .drop-zone input[type="file"] { display: none; }
+
+    .url-input-area {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+    .url-input-area label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--grey-600);
+    }
+    .url-input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .url-input-row input {
+      flex: 1;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--grey-200);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-family: var(--font-main);
+      outline: none;
+      transition: var(--transition);
+    }
+    .url-input-row input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+    .btn-primary {
+      background: var(--teal);
+      color: white;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+    .btn-primary:hover { background: var(--teal-dark); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Export guide accordion */
+    .export-guide { margin-top: 1rem; }
+    .export-guide summary {
+      font-size: 0.78rem;
+      color: var(--teal-dark);
+      cursor: pointer;
+      font-weight: 600;
+      padding: 0.4rem 0;
+      list-style: none;
+    }
+    .export-guide summary::-webkit-details-marker { display: none; }
+    .export-guide summary::before { content: '+ '; font-weight: 700; }
+    .export-guide[open] summary::before { content: '- '; }
+    .export-guide-content {
+      padding: 0.75rem;
+      background: var(--grey-50);
+      border-radius: var(--radius-sm);
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--grey-600);
+    }
+    .export-guide-content h4 { font-size: 0.78rem; color: var(--dark); margin: 0.75rem 0 0.25rem; }
+    .export-guide-content h4:first-child { margin-top: 0; }
+    .export-guide-content ol { padding-left: 1.2rem; margin: 0.25rem 0; }
+    .export-guide-content .coming-soon {
+      display: inline-block;
+      font-size: 0.65rem;
+      background: var(--teal-dim);
+      color: var(--teal-dark);
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+      font-weight: 600;
+      margin-left: 0.3rem;
+    }
+
+    /* ─── LOADING ───────────────────────────────────────────────── */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    .loading-overlay.visible { display: flex; }
+    .loading-box {
+      background: white;
+      border-radius: var(--radius);
+      padding: 2rem 2.5rem;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--grey-200);
+      border-top-color: var(--teal);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 0.75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── ERROR MESSAGE ─────────────────────────────────────────── */
+    .error-msg {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      margin-top: 1rem;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ─── ANALYSIS SECTION ──────────────────────────────────────── */
+    .analysis-section {
+      display: none;
+      animation: fadeIn 0.35s ease-out;
+    }
+    .analysis-section.visible { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+      padding: 0.75rem 1rem;
+      flex: 1;
+      min-width: 120px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--dark);
+      font-family: var(--font-mono);
+    }
+    .stat-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--grey-400);
+      margin-top: 0.15rem;
+      font-weight: 600;
+    }
+
+    /* Speed slider */
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+      padding: 0.5rem 1rem;
+      font-size: 0.78rem;
+    }
+    .speed-control label { font-weight: 600; color: var(--grey-600); white-space: nowrap; }
+    .speed-control input[type="range"] { flex: 1; accent-color: var(--teal); }
+    .speed-control .speed-val { font-weight: 800; color: var(--teal-dark); min-width: 4.5rem; text-align: right; font-family: var(--font-mono); }
+
+    /* Map container */
+    .map-wrap {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    .map-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.75rem;
+      background: var(--grey-50);
+      border-bottom: 1px solid var(--grey-100);
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .map-toolbar .route-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--dark);
+    }
+    .map-toolbar .toolbar-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .toggle-btn {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.3rem 0.6rem;
+      border-radius: 20px;
+      border: 1px solid var(--grey-200);
+      background: white;
+      color: var(--grey-600);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .toggle-btn:hover { border-color: var(--teal); color: var(--teal-dark); }
+    .toggle-btn.active {
+      background: var(--teal);
+      color: white;
+      border-color: var(--teal);
+    }
+    #analyserMap {
+      width: 100%;
+      height: 500px;
+      z-index: 1;
+      position: relative;
+    }
+
+    /* ─── ELEVATION ─────────────────────────────────────────────── */
+    .elevation-wrap {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .elevation-wrap h3 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .elev-chart-container { height: 180px; position: relative; }
+    .no-elevation {
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--grey-400);
+      font-size: 0.85rem;
+    }
+
+    /* ─── WEATHER ───────────────────────────────────────────────── */
+    .weather-section {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .weather-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .weather-header h3 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--dark);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .weather-header input[type="date"] {
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--grey-200);
+      border-radius: var(--radius-xs);
+      font-size: 0.8rem;
+      font-family: var(--font-main);
+      outline: none;
+    }
+    .weather-header input[type="date"]:focus { border-color: var(--teal); }
+    .hourly-strip {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      scrollbar-width: thin;
+    }
+    .hour-card {
+      flex-shrink: 0;
+      width: 72px;
+      background: var(--grey-50);
+      border-radius: var(--radius-sm);
+      padding: 0.5rem;
+      text-align: center;
+      font-size: 0.7rem;
+      border: 1px solid var(--grey-100);
+    }
+    .hour-card .hour-time { font-weight: 700; color: var(--dark); margin-bottom: 0.2rem; }
+    .hour-card .hour-icon { font-size: 1.2rem; margin: 0.15rem 0; }
+    .hour-card .hour-temp { font-weight: 700; color: var(--dark); }
+    .hour-card .hour-wind { color: var(--grey-400); font-size: 0.65rem; margin-top: 0.15rem; }
+    .hour-card .hour-rain { color: var(--blue); font-size: 0.65rem; }
+    .weather-loading, .weather-error {
+      padding: 1rem;
+      text-align: center;
+      color: var(--grey-400);
+      font-size: 0.85rem;
+    }
+
+    /* ─── WIND ANALYSIS ─────────────────────────────────────────── */
+    .wind-section {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .wind-section h3 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--dark);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+    }
+    .wind-summary {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .wind-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .wind-badge-tailwind { background: #d4f4e8; color: #0e7d52; }
+    .wind-badge-headwind { background: #fde8e8; color: #9b1c1c; }
+    .wind-badge-crosswind { background: #fef3d7; color: #9b6b00; }
+    .wind-detail { font-size: 0.8rem; color: var(--grey-600); line-height: 1.6; }
+
+    /* ─── CLOSURE MARKERS ───────────────────────────────────────── */
+    .closure-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      font-size: 11px;
+      line-height: 1;
+      text-align: center;
+    }
+    .closure-marker-closure { background: #dc2626; }
+    .closure-marker-roadwork { background: #f59e0b; }
+
+    /* ─── ACTIONS BAR ───────────────────────────────────────────── */
+    .actions-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--grey-200);
+      background: white;
+      color: var(--grey-600);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .action-btn:hover { border-color: var(--teal); color: var(--teal-dark); }
+
+    /* ─── FOOTER ─────────────────────────────────────────────────── */
+    .site-footer {
+      background: var(--dark-deep);
+      color: rgba(255,255,255,0.35);
+      text-align: center;
+      font-size: 0.72rem;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      line-height: 1.6;
+    }
+
+    /* ─── RESPONSIVE ─────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .input-methods { grid-template-columns: 1fr; }
+      #analyserMap { height: 300px; }
+      .stats-bar { flex-direction: column; }
+      .stat-card { min-width: 0; }
+      .stat-card { flex: 0 0 calc(50% - 0.375rem); }
+      .stats-bar { flex-direction: row; flex-wrap: wrap; }
+      .hero { padding: 1.5rem 1rem 1rem; }
+      .app-body { padding: 1rem; }
+      .speed-control { flex-wrap: wrap; }
+      .hour-card { width: 64px; }
+      .header-nav { gap: 0.25rem; }
+      .header-tag { font-size: 0.6rem; padding: 0.25rem 0.5rem; }
+    }
+    @media (min-width: 601px) and (max-width: 800px) {
+      #analyserMap { height: 400px; }
+    }
+
+    /* ─── PRINT ──────────────────────────────────────────────────── */
+    @media print {
+      .site-header, .site-footer, .input-section, .actions-bar, .speed-control, .map-toolbar { display: none !important; }
+      .hero { padding: 0.5rem; background: white !important; }
+      .hero h1 { color: black !important; font-size: 1.2rem; }
+      .hero-sub { color: #666 !important; }
+      .analysis-section { display: block !important; }
+      .map-wrap, .elevation-wrap, .weather-section, .wind-section { box-shadow: none; border: 1px solid #ddd; }
+      #analyserMap { height: 350px; }
+      body { background: white; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ── HEADER ────────────────────────────────────────────────────── -->
+<header class="site-header">
+  <div class="brand">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 17a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm14-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1a4 4 0 1 1 0-8 4 4 0 0 1 0 8ZM12 7.5l-3 3.5h6V9.5l2 1.5H12.5L15 7.5H12Zm-1-1.5h5l-2.5 3H17l3 2.25-3.5.25V13H9.5L8 11h2L12 8l-1-2Z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">SOCC</div>
+      <div class="brand-sub">Swavesey & Over Cycling Club</div>
+    </div>
+  </div>
+  <nav class="header-nav">
+    <a href="index.html" class="header-tag">Route Finder</a>
+    <span class="header-tag active">Route Analyser</span>
+  </nav>
+</header>
+
+<!-- ── HERO ──────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Analyse your <span>cycling route</span></h1>
+    <p class="hero-sub">Upload a GPX file to see road closures, elevation, weather and wind analysis</p>
+  </div>
+</section>
+
+<!-- ── MAIN CONTENT ─────────────────────────────────────────────── -->
+<main class="app-body">
+
+  <!-- Input Section -->
+  <section class="input-section" id="inputSection">
+    <h2>Load a route</h2>
+    <div class="input-methods">
+      <!-- Drag & Drop / File Upload -->
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Upload GPX file">
+        <div class="drop-zone-icon">📂</div>
+        <div class="drop-zone-text">Drag &amp; drop a GPX file here</div>
+        <div class="drop-zone-hint">or click to browse</div>
+        <input type="file" id="fileInput" accept=".gpx,.xml" aria-label="Choose GPX file">
+      </div>
+
+      <!-- URL Input -->
+      <div class="url-input-area">
+        <label for="gpxUrl">Or paste a GPX file URL</label>
+        <div class="url-input-row">
+          <input type="url" id="gpxUrl" placeholder="https://example.com/route.gpx" autocomplete="off">
+          <button class="btn-primary" id="loadUrlBtn" type="button">Load</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--grey-400);margin-top:0.25rem">
+          Works with any publicly accessible .gpx file URL
+        </div>
+      </div>
+    </div>
+
+    <!-- Export instructions -->
+    <details class="export-guide">
+      <summary>How to export GPX from popular platforms</summary>
+      <div class="export-guide-content">
+        <h4>Garmin Connect <span class="coming-soon">Direct import coming soon</span></h4>
+        <ol>
+          <li>Open your course/activity on <a href="https://connect.garmin.com" target="_blank" rel="noopener noreferrer" style="color:var(--teal-dark)">connect.garmin.com</a></li>
+          <li>Click the gear icon (top right) and select "Export to GPX"</li>
+          <li>Upload the downloaded .gpx file above</li>
+        </ol>
+
+        <h4>Komoot <span class="coming-soon">Direct import coming soon</span></h4>
+        <ol>
+          <li>Open your tour on <a href="https://www.komoot.com" target="_blank" rel="noopener noreferrer" style="color:var(--teal-dark)">komoot.com</a></li>
+          <li>Click "More" then "Download GPX"</li>
+          <li>Upload the downloaded .gpx file above</li>
+        </ol>
+
+        <h4>Strava</h4>
+        <ol>
+          <li>Open the route on <a href="https://www.strava.com" target="_blank" rel="noopener noreferrer" style="color:var(--teal-dark)">strava.com</a></li>
+          <li>Click the "..." menu and select "Export GPX"</li>
+          <li>Upload the downloaded .gpx file above</li>
+        </ol>
+
+        <h4>RideWithGPS</h4>
+        <ol>
+          <li>Open the route on <a href="https://ridewithgps.com" target="_blank" rel="noopener noreferrer" style="color:var(--teal-dark)">ridewithgps.com</a></li>
+          <li>Click "Export" and choose GPX Track</li>
+          <li>Upload the file, or copy the direct GPX URL and paste above</li>
+        </ol>
+      </div>
+    </details>
+
+    <div class="error-msg" id="errorMsg"></div>
+  </section>
+
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <div id="loadingText">Parsing route...</div>
+    </div>
+  </div>
+
+  <!-- Analysis Section (hidden until route loaded) -->
+  <section class="analysis-section" id="analysisSection">
+
+    <!-- Actions bar -->
+    <div class="actions-bar">
+      <button class="action-btn" id="resetBtn" type="button">🔄 Analyse another route</button>
+      <button class="action-btn" id="shareBtn" type="button" style="display:none">🔗 Copy share link</button>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card"><div class="stat-value" id="statDist">—</div><div class="stat-label">Distance</div></div>
+      <div class="stat-card"><div class="stat-value" id="statTime">—</div><div class="stat-label">Est. ride time</div></div>
+      <div class="stat-card"><div class="stat-value" id="statAscent">—</div><div class="stat-label">Total ascent</div></div>
+      <div class="stat-card"><div class="stat-value" id="statDescent">—</div><div class="stat-label">Total descent</div></div>
+      <div class="stat-card"><div class="stat-value" id="statMaxElev">—</div><div class="stat-label">Max elevation</div></div>
+      <div class="stat-card"><div class="stat-value" id="statMinElev">—</div><div class="stat-label">Min elevation</div></div>
+    </div>
+
+    <!-- Speed slider -->
+    <div class="speed-control">
+      <label for="speedSlider">Avg speed</label>
+      <input type="range" id="speedSlider" min="8" max="28" step="0.5" value="18">
+      <span class="speed-val" id="speedVal">18.0 mph</span>
+    </div>
+
+    <!-- Map -->
+    <div class="map-wrap">
+      <div class="map-toolbar">
+        <span class="route-title" id="routeTitle">Route</span>
+        <div class="toolbar-actions">
+          <button class="toggle-btn active" id="closuresToggle" type="button">🚧 Closures</button>
+        </div>
+      </div>
+      <div id="analyserMap"></div>
+    </div>
+
+    <!-- Elevation -->
+    <div class="elevation-wrap" id="elevationWrap">
+      <h3>Elevation profile</h3>
+      <div class="elev-chart-container">
+        <canvas id="elevChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Weather -->
+    <div class="weather-section" id="weatherSection">
+      <div class="weather-header">
+        <h3>Weather forecast</h3>
+        <input type="date" id="weatherDate" aria-label="Forecast date">
+      </div>
+      <div id="weatherContent">
+        <div class="weather-loading">Loading weather...</div>
+      </div>
+    </div>
+
+    <!-- Wind analysis -->
+    <div class="wind-section" id="windSection">
+      <h3>Wind analysis</h3>
+      <div id="windContent">
+        <div class="weather-loading">Analysing wind...</div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  SOCC — Swavesey & Over Cycling Club &nbsp;|&nbsp;
+  Route data maintained by club organisers &nbsp;|&nbsp;
+  Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style="color:rgba(255,255,255,0.55)">OpenStreetMap</a> contributors
+</footer>
+
+<!-- ─── SCRIPTS ──────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',
+  DEFAULT_AVG_SPEED_MPH: 18,
+  MAX_FORECAST_DAYS: 16,
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════ */
+function escHtml(s) {
+  if (s === null || s === undefined || s === false) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function safe(v) {
+  if (v === null || v === undefined || v === false || v === true) return '';
+  return String(v).trim();
+}
+
+function safeNum(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function degreesToCompass(deg) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+const WMO_CODES = {
+  0: { icon: '☀️', desc: 'Clear sky' },
+  1: { icon: '🌤️', desc: 'Mainly clear' },
+  2: { icon: '⛅', desc: 'Partly cloudy' },
+  3: { icon: '☁️', desc: 'Overcast' },
+  45: { icon: '🌫️', desc: 'Foggy' },
+  48: { icon: '🌫️', desc: 'Icy fog' },
+  51: { icon: '🌦️', desc: 'Light drizzle' },
+  53: { icon: '🌦️', desc: 'Drizzle' },
+  55: { icon: '🌧️', desc: 'Heavy drizzle' },
+  61: { icon: '🌧️', desc: 'Light rain' },
+  63: { icon: '🌧️', desc: 'Rain' },
+  65: { icon: '🌧️', desc: 'Heavy rain' },
+  66: { icon: '🌨️', desc: 'Freezing rain' },
+  67: { icon: '🌨️', desc: 'Heavy freezing rain' },
+  71: { icon: '🌨️', desc: 'Light snow' },
+  73: { icon: '🌨️', desc: 'Snow' },
+  75: { icon: '❄️', desc: 'Heavy snow' },
+  77: { icon: '🌨️', desc: 'Snow grains' },
+  80: { icon: '🌦️', desc: 'Light showers' },
+  81: { icon: '🌧️', desc: 'Showers' },
+  82: { icon: '⛈️', desc: 'Heavy showers' },
+  85: { icon: '🌨️', desc: 'Snow showers' },
+  86: { icon: '❄️', desc: 'Heavy snow showers' },
+  95: { icon: '⛈️', desc: 'Thunderstorm' },
+  96: { icon: '⛈️', desc: 'Thunderstorm + hail' },
+  99: { icon: '⛈️', desc: 'Thunderstorm + heavy hail' },
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════════════ */
+let mapInstance = null;
+let routeLayer = null;
+let closureLayer = null;
+let elevChart = null;
+let currentRoute = null;   // { points, name, bounds, totalDist, totalAscent, totalDescent, maxElev, minElev }
+let currentWeather = null;
+let closuresVisible = true;
+let currentGpxUrl = null;  // for shareable links
+
+/* ════════════════════════════════════════════════════════════════════
+   GPX PARSING
+   ════════════════════════════════════════════════════════════════════ */
+function parseGpxText(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'application/xml');
+
+  // Check for parse errors
+  const parseErr = doc.querySelector('parsererror');
+  if (parseErr) throw new Error('Invalid GPX file format');
+
+  // Try tracks first, then routes
+  let pointEls = doc.querySelectorAll('trk > trkseg > trkpt');
+  if (pointEls.length === 0) {
+    pointEls = doc.querySelectorAll('rte > rtept');
+  }
+  if (pointEls.length === 0) {
+    throw new Error('No track or route points found in this GPX file');
+  }
+
+  // Extract points
+  const points = [];
+  for (const el of pointEls) {
+    const lat = parseFloat(el.getAttribute('lat'));
+    const lon = parseFloat(el.getAttribute('lon'));
+    if (isNaN(lat) || isNaN(lon)) continue;
+    const eleEl = el.querySelector('ele');
+    const timeEl = el.querySelector('time');
+    points.push({
+      lat, lon,
+      ele: eleEl ? parseFloat(eleEl.textContent) : null,
+      time: timeEl ? timeEl.textContent : null,
+    });
+  }
+
+  if (points.length < 2) {
+    throw new Error('GPX file needs at least 2 valid points');
+  }
+
+  // Route name
+  const nameEl = doc.querySelector('trk > name') || doc.querySelector('rte > name') || doc.querySelector('metadata > name');
+  const name = nameEl ? safe(nameEl.textContent) : 'Uploaded Route';
+
+  // Calculate stats
+  let totalDist = 0;
+  let totalAscent = 0;
+  let totalDescent = 0;
+  let maxElev = -Infinity;
+  let minElev = Infinity;
+  const hasElevation = points.some(p => p.ele !== null);
+
+  // Accumulate elevation changes in same direction, then apply noise threshold.
+  // This avoids discarding real ascent that happens in small increments (dense GPX points).
+  let elevAccum = 0; // accumulated elevation change in current direction
+
+  for (let i = 0; i < points.length; i++) {
+    if (hasElevation && points[i].ele !== null) {
+      if (points[i].ele > maxElev) maxElev = points[i].ele;
+      if (points[i].ele < minElev) minElev = points[i].ele;
+    }
+    if (i > 0) {
+      totalDist += haversine(points[i - 1], points[i]);
+      if (hasElevation && points[i].ele !== null && points[i - 1].ele !== null) {
+        const diff = points[i].ele - points[i - 1].ele;
+        // If same direction as accumulated, keep accumulating
+        if ((elevAccum >= 0 && diff >= 0) || (elevAccum <= 0 && diff <= 0)) {
+          elevAccum += diff;
+        } else {
+          // Direction changed — commit accumulated if above 2m noise threshold
+          if (elevAccum > 2) totalAscent += elevAccum;
+          else if (elevAccum < -2) totalDescent += Math.abs(elevAccum);
+          elevAccum = diff;
+        }
+      }
+    }
+  }
+  // Commit final accumulation
+  if (elevAccum > 2) totalAscent += elevAccum;
+  else if (elevAccum < -2) totalDescent += Math.abs(elevAccum);
+
+  // Bounds
+  const lats = points.map(p => p.lat);
+  const lons = points.map(p => p.lon);
+  const bounds = [
+    [Math.min(...lats), Math.min(...lons)],
+    [Math.max(...lats), Math.max(...lons)],
+  ];
+
+  return {
+    points,
+    name,
+    bounds,
+    hasElevation,
+    totalDist,       // metres
+    totalAscent,     // metres
+    totalDescent,    // metres
+    maxElev: hasElevation ? maxElev : null,
+    minElev: hasElevation ? minElev : null,
+  };
+}
+
+function haversine(a, b) {
+  const R = 6371000;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLon = (b.lon - a.lon) * Math.PI / 180;
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+  const h = sinLat * sinLat + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * sinLon * sinLon;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function calcBearing(a, b) {
+  const dLon = (b.lon - a.lon) * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(b.lat * Math.PI / 180);
+  const x = Math.cos(a.lat * Math.PI / 180) * Math.sin(b.lat * Math.PI / 180) -
+            Math.sin(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MAP
+   ════════════════════════════════════════════════════════════════════ */
+async function initMap() {
+  if (mapInstance) return;
+  const mapEl = document.getElementById('analyserMap');
+  // Short delay to ensure container is laid out before Leaflet measures it
+  await new Promise(r => setTimeout(r, 100));
+  mapInstance = L.map(mapEl).setView([52.3, 0.0], 8);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(mapInstance);
+}
+
+function displayRoute(route) {
+  if (!mapInstance) return;
+
+  // Clear old layers
+  if (routeLayer) { mapInstance.removeLayer(routeLayer); routeLayer = null; }
+  if (closureLayer) { mapInstance.removeLayer(closureLayer); closureLayer = null; }
+
+  routeLayer = L.layerGroup().addTo(mapInstance);
+
+  // Route polyline
+  const latlngs = route.points.map(p => [p.lat, p.lon]);
+  const polyline = L.polyline(latlngs, {
+    color: '#2CBCB3',
+    weight: 3.5,
+    opacity: 0.9,
+  });
+  polyline.on('mouseover', function() { this.setStyle({ weight: 5, opacity: 1 }); });
+  polyline.on('mouseout', function() { this.setStyle({ weight: 3.5, opacity: 0.9 }); });
+  polyline.addTo(routeLayer);
+
+  // Start marker (green)
+  const startIcon = L.divIcon({
+    html: '<div style="background:#10b981;border:3px solid white;border-radius:50%;width:20px;height:20px;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',
+    iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+  });
+  L.marker([route.points[0].lat, route.points[0].lon], { icon: startIcon })
+    .bindPopup('<b>Start</b>')
+    .addTo(routeLayer);
+
+  // End marker (red)
+  const endPt = route.points[route.points.length - 1];
+  const endIcon = L.divIcon({
+    html: '<div style="background:#ef4444;border:3px solid white;border-radius:50%;width:20px;height:20px;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',
+    iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+  });
+  L.marker([endPt.lat, endPt.lon], { icon: endIcon })
+    .bindPopup('<b>End</b>')
+    .addTo(routeLayer);
+
+  // Direction arrows
+  addDirectionArrows(routeLayer, route.points);
+
+  // Fit map to route
+  mapInstance.fitBounds(route.bounds, { padding: [30, 30] });
+}
+
+function addDirectionArrows(layer, points) {
+  if (points.length < 2) return;
+  const ARROW_INTERVAL_M = 8000;
+  let accDist = 0;
+  const colour = '#1B2631';
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const d = haversine(points[i], points[i + 1]);
+    accDist += d;
+
+    if (accDist >= ARROW_INTERVAL_M) {
+      const bearing = calcBearing(points[i], points[i + 1]);
+      const icon = L.divIcon({
+        className: '',
+        html: `<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${bearing}deg); filter: drop-shadow(0 0 1.5px white); opacity:0.85; pointer-events:none; display:block;">
+                 <path d="M3 10L7 6L11 10" stroke="${colour}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+               </svg>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      L.marker([points[i + 1].lat, points[i + 1].lon], { icon, interactive: false }).addTo(layer);
+      accDist = 0;
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   STATS
+   ════════════════════════════════════════════════════════════════════ */
+function renderStats(route, avgSpeedMph) {
+  const distMi = route.totalDist / 1609.344;
+  const distKm = route.totalDist / 1000;
+  const timeHrs = distMi / avgSpeedMph;
+  const hrs = Math.floor(timeHrs);
+  const mins = Math.round((timeHrs - hrs) * 60);
+
+  document.getElementById('statDist').textContent = `${distMi.toFixed(1)} mi / ${distKm.toFixed(1)} km`;
+  document.getElementById('statTime').textContent = `${hrs}h ${mins}m`;
+  document.getElementById('statAscent').textContent = route.hasElevation ? `${Math.round(route.totalAscent)} m` : 'N/A';
+  document.getElementById('statDescent').textContent = route.hasElevation ? `${Math.round(route.totalDescent)} m` : 'N/A';
+  document.getElementById('statMaxElev').textContent = route.maxElev !== null ? `${Math.round(route.maxElev)} m` : 'N/A';
+  document.getElementById('statMinElev').textContent = route.minElev !== null ? `${Math.round(route.minElev)} m` : 'N/A';
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ELEVATION CHART
+   ════════════════════════════════════════════════════════════════════ */
+function buildElevationProfile(route) {
+  const container = document.querySelector('.elev-chart-container');
+  if (!container) return;
+
+  if (!route.hasElevation) {
+    container.innerHTML = '<div class="no-elevation">No elevation data in this GPX file</div>';
+    return;
+  }
+
+  // Ensure canvas exists
+  container.innerHTML = '<canvas id="elevChart"></canvas>';
+  const canvas = document.getElementById('elevChart');
+
+  // Build distance-based labels and elevation data
+  const elevData = [];
+  const distLabels = [];
+  let cumDist = 0;
+
+  // Downsample to ~300 points
+  const step = Math.max(1, Math.floor(route.points.length / 300));
+  for (let i = 0; i < route.points.length; i += step) {
+    if (i > 0) cumDist += haversine(route.points[Math.max(0, i - step)], route.points[i]);
+    if (route.points[i].ele !== null) {
+      elevData.push(route.points[i].ele);
+      distLabels.push((cumDist / 1000).toFixed(1));
+    }
+  }
+
+  if (elevData.length === 0) {
+    container.innerHTML = '<div class="no-elevation">No elevation data in this GPX file</div>';
+    return;
+  }
+
+  if (elevChart) elevChart.destroy();
+  elevChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: distLabels,
+      datasets: [{
+        data: elevData,
+        borderColor: '#2CBCB3',
+        backgroundColor: 'rgba(44,188,179,0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].label} km`,
+            label: (item) => `${Math.round(item.raw)} m`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          ticks: { font: { size: 9 }, color: '#8c97a8', maxTicksLimit: 8, callback: (v, i, t) => distLabels[i] ? distLabels[i] + ' km' : '' },
+          grid: { display: false },
+        },
+        y: {
+          display: true,
+          ticks: { font: { size: 9 }, color: '#8c97a8', maxTicksLimit: 5, callback: (v) => v + ' m' },
+          grid: { color: '#eef0f4' },
+        }
+      },
+      interaction: { mode: 'index', intersect: false },
+    }
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ROAD CLOSURES
+   ════════════════════════════════════════════════════════════════════ */
+async function fetchRouteClosures(route) {
+  if (!CONFIG.TOMTOM_API_KEY) return [];
+
+  const pts = route.points;
+  const BUFFER = 0.005;
+  let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+  for (const p of pts) {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lon < minLon) minLon = p.lon;
+    if (p.lon > maxLon) maxLon = p.lon;
+  }
+  minLat -= BUFFER; maxLat += BUFFER;
+  minLon -= BUFFER; maxLon += BUFFER;
+
+  const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
+  const apiUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails`
+    + `?key=${encodeURIComponent(CONFIG.TOMTOM_API_KEY)}`
+    + `&bbox=${bbox}`
+    + `&fields=${encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,startTime,endTime,events{description}}}}')}`
+    + `&language=en-GB`
+    + `&categoryFilter=6,7,8,9`
+    + `&timeValidityFilter=present`;
+
+  try {
+    const resp = await fetch(apiUrl);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!data.incidents) return [];
+
+    // Sample route points for proximity check (every Nth point, max ~30)
+    const sampleStep = Math.max(1, Math.floor(pts.length / 30));
+    const samples = [];
+    for (let i = 0; i < pts.length; i += sampleStep) {
+      samples.push(pts[i]);
+    }
+    samples.push(pts[pts.length - 1]);
+
+    const incidents = [];
+    for (const inc of data.incidents) {
+      const props = inc.properties || {};
+      const geom = inc.geometry || {};
+      const coords = geom.coordinates || [];
+      const cat = props.iconCategory;
+      if (![6, 7, 8, 9].includes(cat) || coords.length === 0) continue;
+
+      // Check proximity to route
+      let nearRoute = false;
+      for (const coord of coords) {
+        const incLon = Array.isArray(coord[0]) ? coord[0][0] : coord[0];
+        const incLat = Array.isArray(coord[0]) ? coord[0][1] : coord[1];
+        for (const s of samples) {
+          if (Math.abs(incLat - s.lat) < 0.002 && Math.abs(incLon - s.lon) < 0.003) {
+            nearRoute = true;
+            break;
+          }
+        }
+        if (nearRoute) break;
+      }
+
+      if (nearRoute) {
+        const isClosure = cat === 7 || cat === 8;
+        const desc = (props.events && props.events[0] && props.events[0].description) || 'Road incident';
+        const midIdx = Math.floor(coords.length / 2);
+        incidents.push({
+          isClosure,
+          description: desc,
+          from: props.from || '',
+          to: props.to || '',
+          startTime: props.startTime || null,
+          endTime: props.endTime || null,
+          midLat: coords[midIdx][1],
+          midLon: coords[midIdx][0],
+          latLngs: coords.map(c => [c[1], c[0]]),
+        });
+      }
+    }
+    return incidents;
+  } catch (e) {
+    console.warn('Road closure check failed:', e);
+    return [];
+  }
+}
+
+function displayClosures(incidents) {
+  if (!mapInstance) return;
+  if (closureLayer) { mapInstance.removeLayer(closureLayer); }
+  closureLayer = L.layerGroup();
+
+  for (const inc of incidents) {
+    const emoji = inc.isClosure ? '🚫' : '🚧';
+    const markerCls = inc.isClosure ? 'closure-marker-closure' : 'closure-marker-roadwork';
+    const size = 22;
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="closure-marker ${markerCls}" style="width:${size}px;height:${size}px">${emoji}</div>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+
+    const popupHtml = `
+      <div style="font-size:0.8rem;max-width:240px">
+        <b>${emoji} ${inc.isClosure ? 'Road Closure' : 'Roadworks'}</b><br>
+        ${escHtml(inc.description)}<br>
+        ${inc.from ? `<span style="color:#666">From: ${escHtml(inc.from)}</span><br>` : ''}
+        ${inc.to ? `<span style="color:#666">To: ${escHtml(inc.to)}</span><br>` : ''}
+        ${inc.startTime ? `<span style="color:#999;font-size:0.7rem">Since: ${new Date(inc.startTime).toLocaleDateString('en-GB')}</span>` : ''}
+      </div>`;
+
+    const marker = L.marker([inc.midLat, inc.midLon], { icon, interactive: true });
+    marker.bindPopup(popupHtml, { maxWidth: 260 });
+    marker.bindTooltip(`${emoji} ${escHtml(inc.description)}`, { sticky: true });
+    marker.addTo(closureLayer);
+  }
+
+  if (closuresVisible) closureLayer.addTo(mapInstance);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   WEATHER
+   ════════════════════════════════════════════════════════════════════ */
+async function fetchWeather(lat, lon, dateStr) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+    + `&hourly=temperature_2m,precipitation_probability,weathercode,wind_speed_10m,wind_direction_10m,wind_gusts_10m`
+    + `&wind_speed_unit=mph&timezone=Europe%2FLondon`
+    + `&start_date=${dateStr}&end_date=${dateStr}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    const hours = json.hourly.time.map((t, i) => {
+      const wmo = json.hourly.weathercode[i];
+      const wmoInfo = WMO_CODES[wmo] || { icon: '🌤️', desc: 'Unknown' };
+      return {
+        time: t,
+        hour: new Date(t).getHours(),
+        temp: Math.round(json.hourly.temperature_2m[i]),
+        rainProb: Math.round(json.hourly.precipitation_probability[i] || 0),
+        windSpeed: Math.round(json.hourly.wind_speed_10m[i]),
+        windDir: Math.round(json.hourly.wind_direction_10m[i] || 0),
+        windGusts: Math.round(json.hourly.wind_gusts_10m[i] || 0),
+        weatherCode: wmo,
+        icon: wmoInfo.icon,
+        desc: wmoInfo.desc,
+      };
+    });
+
+    return hours;
+  } catch (e) {
+    console.warn('Weather fetch failed:', e);
+    return null;
+  }
+}
+
+function renderWeather(hours) {
+  const container = document.getElementById('weatherContent');
+  if (!hours) {
+    container.innerHTML = '<div class="weather-error">Weather data unavailable</div>';
+    return;
+  }
+
+  // Show hours 6am to 9pm (typical riding window)
+  const ridingHours = hours.filter(h => h.hour >= 6 && h.hour <= 21);
+  if (ridingHours.length === 0) {
+    container.innerHTML = '<div class="weather-error">No forecast data for selected date</div>';
+    return;
+  }
+
+  let html = '<div class="hourly-strip">';
+  for (const h of ridingHours) {
+    const timeStr = `${String(h.hour).padStart(2, '0')}:00`;
+    html += `
+      <div class="hour-card">
+        <div class="hour-time">${escHtml(timeStr)}</div>
+        <div class="hour-icon">${h.icon}</div>
+        <div class="hour-temp">${h.temp}&deg;C</div>
+        <div class="hour-wind">${degreesToCompass(h.windDir)} ${h.windSpeed} mph</div>
+        <div class="hour-rain">${h.rainProb}% rain</div>
+      </div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   WIND ANALYSIS
+   ════════════════════════════════════════════════════════════════════ */
+function analyseWind(route, weatherHours) {
+  const container = document.getElementById('windContent');
+  if (!weatherHours || weatherHours.length === 0 || route.points.length < 2) {
+    container.innerHTML = '<div class="weather-loading">Wind analysis unavailable</div>';
+    return;
+  }
+
+  // Get average wind for riding hours (8am-5pm)
+  const ridingWind = weatherHours.filter(h => h.hour >= 8 && h.hour <= 17);
+  if (ridingWind.length === 0) {
+    container.innerHTML = '<div class="weather-loading">No wind data for riding hours</div>';
+    return;
+  }
+
+  const avgWindDir = ridingWind.reduce((s, h) => s + h.windDir, 0) / ridingWind.length;
+  const avgWindSpeed = ridingWind.reduce((s, h) => s + h.windSpeed, 0) / ridingWind.length;
+
+  // Split route into segments and classify
+  const pts = route.points;
+  const halfIdx = Math.floor(pts.length / 2);
+  const segments = [
+    { label: 'First half', pts: pts.slice(0, halfIdx + 1) },
+    { label: 'Second half', pts: pts.slice(halfIdx) },
+  ];
+
+  let totalHeadwind = 0, totalTailwind = 0, totalCrosswind = 0, totalDist = 0;
+  const segResults = [];
+
+  for (const seg of segments) {
+    let headDist = 0, tailDist = 0, crossDist = 0, segDist = 0;
+    for (let i = 0; i < seg.pts.length - 1; i++) {
+      const d = haversine(seg.pts[i], seg.pts[i + 1]);
+      const bearing = calcBearing(seg.pts[i], seg.pts[i + 1]);
+      // Angle between wind direction (where wind comes FROM) and riding direction
+      let angleDiff = Math.abs(avgWindDir - bearing);
+      if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+      segDist += d;
+      if (angleDiff < 45) {
+        // Wind coming from same direction as travel = tailwind
+        tailDist += d;
+      } else if (angleDiff > 135) {
+        // Wind coming from opposite direction = headwind
+        headDist += d;
+      } else {
+        crossDist += d;
+      }
+    }
+    totalHeadwind += headDist;
+    totalTailwind += tailDist;
+    totalCrosswind += crossDist;
+    totalDist += segDist;
+
+    const dominant = headDist > tailDist && headDist > crossDist ? 'headwind'
+                   : tailDist > headDist && tailDist > crossDist ? 'tailwind'
+                   : 'crosswind';
+    segResults.push({ label: seg.label, dominant, headDist, tailDist, crossDist, segDist });
+  }
+
+  // Build summary
+  const headPct = totalDist > 0 ? Math.round(totalHeadwind / totalDist * 100) : 0;
+  const tailPct = totalDist > 0 ? Math.round(totalTailwind / totalDist * 100) : 0;
+  const crossPct = totalDist > 0 ? Math.round(totalCrosswind / totalDist * 100) : 0;
+
+  let html = '<div class="wind-summary">';
+  if (tailPct > 0) html += `<span class="wind-badge wind-badge-tailwind">Tailwind ${tailPct}%</span>`;
+  if (headPct > 0) html += `<span class="wind-badge wind-badge-headwind">Headwind ${headPct}%</span>`;
+  if (crossPct > 0) html += `<span class="wind-badge wind-badge-crosswind">Crosswind ${crossPct}%</span>`;
+  html += '</div>';
+
+  html += '<div class="wind-detail">';
+  html += `Wind: ${degreesToCompass(avgWindDir)} at ${Math.round(avgWindSpeed)} mph (avg riding hours)<br>`;
+  for (const seg of segResults) {
+    const icon = seg.dominant === 'tailwind' ? '🟢' : seg.dominant === 'headwind' ? '🔴' : '🟡';
+    html += `${icon} <b>${escHtml(seg.label)}:</b> mostly ${seg.dominant}<br>`;
+  }
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MAIN FLOW
+   ════════════════════════════════════════════════════════════════════ */
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingOverlay').classList.add('visible');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('visible');
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function hideError() {
+  document.getElementById('errorMsg').classList.remove('visible');
+}
+
+async function processRoute(gpxText, sourceUrl) {
+  hideError();
+  showLoading('Parsing route...');
+
+  try {
+    const route = parseGpxText(gpxText);
+    currentRoute = route;
+    currentGpxUrl = sourceUrl || null;
+
+    // Show analysis section
+    document.getElementById('analysisSection').classList.add('visible');
+
+    // Set route title
+    document.getElementById('routeTitle').textContent = escHtml(route.name);
+
+    // Hide loading so map container can be measured by Leaflet
+    hideLoading();
+
+    // Init map and display route
+    await initMap();
+    displayRoute(route);
+
+    // Render stats
+    const avgSpeed = parseFloat(document.getElementById('speedSlider').value) || CONFIG.DEFAULT_AVG_SPEED_MPH;
+    renderStats(route, avgSpeed);
+
+    // Build elevation profile
+    buildElevationProfile(route);
+
+    // Show share button if URL-based
+    document.getElementById('shareBtn').style.display = sourceUrl ? '' : 'none';
+
+    // Fetch closures + weather in parallel
+    showLoading('Checking road closures & weather...');
+    const startPt = route.points[0];
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('weatherDate').value = today;
+
+    // Set date picker bounds
+    const dateInput = document.getElementById('weatherDate');
+    dateInput.min = today;
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + CONFIG.MAX_FORECAST_DAYS);
+    dateInput.max = maxDate.toISOString().slice(0, 10);
+
+    const [incidents, weather] = await Promise.all([
+      fetchRouteClosures(route),
+      fetchWeather(startPt.lat, startPt.lon, today),
+    ]);
+
+    // Display closures
+    displayClosures(incidents);
+    const closureToggle = document.getElementById('closuresToggle');
+    const count = incidents.length;
+    closureToggle.textContent = count > 0 ? `🚧 Closures (${count})` : '🚧 Closures (0)';
+
+    // Display weather
+    currentWeather = weather;
+    renderWeather(weather);
+
+    // Wind analysis
+    analyseWind(route, weather);
+
+    hideLoading();
+
+    // Scroll to analysis
+    document.getElementById('analysisSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch (e) {
+    hideLoading();
+    showError(e.message || 'Failed to process route');
+    console.error('Route processing error:', e);
+  }
+}
+
+function resetAnalysis() {
+  document.getElementById('analysisSection').classList.remove('visible');
+  currentRoute = null;
+  currentGpxUrl = null;
+  currentWeather = null;
+  if (routeLayer) { mapInstance.removeLayer(routeLayer); routeLayer = null; }
+  if (closureLayer) { mapInstance.removeLayer(closureLayer); closureLayer = null; }
+  if (elevChart) { elevChart.destroy(); elevChart = null; }
+  hideError();
+  document.getElementById('gpxUrl').value = '';
+  document.getElementById('inputSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SHAREABLE LINKS
+   ════════════════════════════════════════════════════════════════════ */
+function loadFromUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const gpxUrl = params.get('gpx');
+  if (gpxUrl && gpxUrl.startsWith('https://')) {
+    document.getElementById('gpxUrl').value = gpxUrl;
+    loadGpxFromUrl(gpxUrl);
+  }
+}
+
+async function loadGpxFromUrl(url) {
+  hideError();
+  showLoading('Fetching GPX file...');
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Failed to fetch: HTTP ${resp.status}`);
+    const text = await resp.text();
+    hideLoading();
+    processRoute(text, url);
+  } catch (e) {
+    hideLoading();
+    if (e.message.includes('Failed to fetch') || e.name === 'TypeError') {
+      showError("This URL can't be loaded directly. Please download the GPX file to your local machine and then upload it to this website.");
+    } else {
+      showError(e.message || 'Failed to load GPX from URL');
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   EVENT WIRING
+   ════════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', function() {
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const loadUrlBtn = document.getElementById('loadUrlBtn');
+  const gpxUrlInput = document.getElementById('gpxUrl');
+  const resetBtn = document.getElementById('resetBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  const speedSlider = document.getElementById('speedSlider');
+  const closuresToggle = document.getElementById('closuresToggle');
+  const weatherDate = document.getElementById('weatherDate');
+
+  // Drag & drop
+  dropZone.addEventListener('click', function() { fileInput.click(); });
+  dropZone.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragenter', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) handleFile(files[0]);
+  });
+
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.gpx') && !name.endsWith('.xml')) {
+      showError('Please upload a .gpx or .xml file');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      processRoute(e.target.result, null);
+    };
+    reader.onerror = function() {
+      showError('Failed to read file');
+    };
+    reader.readAsText(file);
+  }
+
+  // URL load
+  loadUrlBtn.addEventListener('click', function() {
+    const url = gpxUrlInput.value.trim();
+    if (!url) { showError('Please enter a URL'); return; }
+    if (!url.startsWith('https://') && !url.startsWith('http://')) {
+      showError('Please enter a valid URL starting with https://');
+      return;
+    }
+    loadGpxFromUrl(url);
+  });
+  gpxUrlInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') loadUrlBtn.click();
+  });
+
+  // Reset
+  resetBtn.addEventListener('click', resetAnalysis);
+
+  // Share
+  shareBtn.addEventListener('click', function() {
+    if (!currentGpxUrl) return;
+    const shareUrl = `${location.origin}${location.pathname}?gpx=${encodeURIComponent(currentGpxUrl)}`;
+    navigator.clipboard.writeText(shareUrl).then(function() {
+      shareBtn.textContent = '✅ Copied!';
+      setTimeout(function() { shareBtn.textContent = '🔗 Copy share link'; }, 2000);
+    }).catch(function() {
+      // Fallback: update URL bar
+      history.replaceState(null, '', `?gpx=${encodeURIComponent(currentGpxUrl)}`);
+      shareBtn.textContent = '✅ URL updated';
+      setTimeout(function() { shareBtn.textContent = '🔗 Copy share link'; }, 2000);
+    });
+  });
+
+  // Speed slider
+  speedSlider.addEventListener('input', function() {
+    const val = parseFloat(speedSlider.value);
+    document.getElementById('speedVal').textContent = `${val.toFixed(1)} mph`;
+    if (currentRoute) renderStats(currentRoute, val);
+  });
+
+  // Closures toggle
+  closuresToggle.addEventListener('click', function() {
+    closuresVisible = !closuresVisible;
+    closuresToggle.classList.toggle('active', closuresVisible);
+    if (closureLayer && mapInstance) {
+      if (closuresVisible) closureLayer.addTo(mapInstance);
+      else mapInstance.removeLayer(closureLayer);
+    }
+  });
+
+  // Weather date change
+  weatherDate.addEventListener('change', async function() {
+    if (!currentRoute) return;
+    const dateStr = weatherDate.value;
+    if (!dateStr) return;
+    document.getElementById('weatherContent').innerHTML = '<div class="weather-loading">Loading weather...</div>';
+    document.getElementById('windContent').innerHTML = '<div class="weather-loading">Analysing wind...</div>';
+    const startPt = currentRoute.points[0];
+    const weather = await fetchWeather(startPt.lat, startPt.lon, dateStr);
+    currentWeather = weather;
+    renderWeather(weather);
+    analyseWind(currentRoute, weather);
+  });
+
+  // Load from URL params if present
+  loadFromUrlParams();
+});
+</script>
+</body>
+</html>
