@@ -557,6 +557,8 @@
     .closure-marker-closure { background: #dc2626; }
     .closure-marker-roadwork { background: #f59e0b; }
 
+    .cafe-marker { background: none; border: none; }
+
     /* ─── ACTIONS BAR ───────────────────────────────────────────── */
     .actions-bar {
       display: flex;
@@ -758,6 +760,7 @@
         <span class="route-title" id="routeTitle">Route</span>
         <div class="toolbar-actions">
           <button class="toggle-btn active" id="closuresToggle" type="button">🚧 Closures</button>
+          <button class="toggle-btn active" id="cafesToggle" type="button">☕ Cafés</button>
         </div>
       </div>
       <div id="analyserMap"></div>
@@ -813,6 +816,15 @@ const CONFIG = {
   TOMTOM_API_KEY: 'gfJ7YgzD1qiK52uAs0WP2zzb5769eMBC',
   DEFAULT_AVG_SPEED_MPH: 18,
   MAX_FORECAST_DAYS: 16,
+  SHEET_ID: '2PACX-1vQflvwcr6Nf1NVyvv45Jt7YWF3fxZO0ecaN8JwMYU4gQeghoYR7eLmkGS7zfSqdlA8VuiIhkQ4eCAYz',
+  CAFES_GID: '2092417686',
+  CAFE_COLUMN_MAP: {
+    'n1': 'route_ref', 'village': 'village', 'name': 'cafe_name',
+    'rating': 'rating', 'notes': 'notes', 'saturday': 'saturday_hours',
+    'sunday opening time': 'sunday_hours', 'lat': 'lat', 'long': 'lon',
+    'website': 'website',
+  },
+  CAFE_PROXIMITY_M: 1000,
 };
 
 /* ════════════════════════════════════════════════════════════════════
@@ -877,6 +889,8 @@ let elevChart = null;
 let currentRoute = null;   // { points, name, bounds, totalDist, totalAscent, totalDescent, maxElev, minElev }
 let currentWeather = null;
 let closuresVisible = true;
+let cafeLayer = null;
+let cafesVisible = true;
 let currentGpxUrl = null;  // for shareable links
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1019,6 +1033,7 @@ function displayRoute(route) {
   // Clear old layers
   if (routeLayer) { mapInstance.removeLayer(routeLayer); routeLayer = null; }
   if (closureLayer) { mapInstance.removeLayer(closureLayer); closureLayer = null; }
+  if (cafeLayer) { mapInstance.removeLayer(cafeLayer); cafeLayer = null; }
 
   routeLayer = L.layerGroup().addTo(mapInstance);
 
@@ -1458,6 +1473,130 @@ function analyseWind(route, weatherHours) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   NEARBY CAFÉS
+   ════════════════════════════════════════════════════════════════════ */
+function smartSplitCSV(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseCafeCSV(csv) {
+  const lines = csv.trim().split('\n');
+  const rawHeaders = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+  const headers = rawHeaders.map(h => {
+    const key = h.toLowerCase();
+    return CONFIG.CAFE_COLUMN_MAP[key] || h;
+  });
+  return lines.slice(1).map(line => {
+    const vals = smartSplitCSV(line);
+    const obj = {};
+    headers.forEach((h, i) => {
+      if (!h) return;
+      let v = (vals[i] || '').replace(/^"|"$/g, '').trim();
+      const vl = v.toLowerCase();
+      if (vl === 'true' || vl === 'yes' || v === '1') v = true;
+      else if (vl === 'false' || vl === 'no' || v === '0') v = false;
+      else if (!isNaN(v) && v !== '') v = parseFloat(v);
+      obj[h] = v;
+    });
+    return obj;
+  });
+}
+
+async function fetchCafes() {
+  const url = `https://docs.google.com/spreadsheets/d/e/${CONFIG.SHEET_ID}/pub?gid=${CONFIG.CAFES_GID}&single=true&output=csv`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const csv = await res.text();
+    if (csv.length < 10 || csv.toLowerCase().includes('<html')) {
+      throw new Error('Invalid CSV response for cafes');
+    }
+    const parsed = parseCafeCSV(csv);
+    return parsed.filter(c => {
+      const lat = parseFloat(c.lat);
+      const lon = parseFloat(c.lon);
+      return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+    });
+  } catch (e) {
+    console.warn('Cafes fetch failed:', e.message);
+    return [];
+  }
+}
+
+function filterNearbyCafes(cafes, routePoints) {
+  const maxDist = CONFIG.CAFE_PROXIMITY_M;
+  return cafes.filter(cafe => {
+    const cLat = parseFloat(cafe.lat);
+    const cLon = parseFloat(cafe.lon);
+    // Check against a sample of route points (every 10th for performance)
+    for (let i = 0; i < routePoints.length; i += 10) {
+      const p = routePoints[i];
+      const dist = haversineM(cLat, cLon, p.lat, p.lon);
+      if (dist <= maxDist) return true;
+    }
+    // Also check last point
+    const last = routePoints[routePoints.length - 1];
+    return haversineM(cLat, cLon, last.lat, last.lon) <= maxDist;
+  });
+}
+
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function displayCafes(cafes) {
+  if (cafeLayer && mapInstance) { mapInstance.removeLayer(cafeLayer); }
+  cafeLayer = L.layerGroup();
+
+  cafes.forEach(cafe => {
+    const lat = parseFloat(cafe.lat);
+    const lon = parseFloat(cafe.lon);
+    const name = escHtml(safe(cafe.cafe_name) || safe(cafe.village) || 'Café');
+    const village = escHtml(safe(cafe.village));
+    const rating = safe(cafe.rating);
+    const satHrs = escHtml(safe(cafe.saturday_hours));
+    const sunHrs = escHtml(safe(cafe.sunday_hours));
+    const notes = escHtml(safe(cafe.notes));
+    const website = safe(cafe.website);
+
+    let popupHtml = `<div style="min-width:160px"><strong>${name}</strong>`;
+    if (village) popupHtml += `<br><span style="color:#6b7280;font-size:0.85em">${village}</span>`;
+    if (rating) popupHtml += `<br>⭐ ${escHtml(String(rating))}`;
+    if (satHrs) popupHtml += `<br>Sat: ${satHrs}`;
+    if (sunHrs) popupHtml += `<br>Sun: ${sunHrs}`;
+    if (notes) popupHtml += `<br><em style="font-size:0.85em">${notes}</em>`;
+    if (website) popupHtml += `<br><a href="${escHtml(website)}" target="_blank" rel="noopener noreferrer" style="color:var(--teal)">Website</a>`;
+    popupHtml += '</div>';
+
+    const icon = L.icon({
+      iconUrl: 'images/cafe-icon.png',
+      shadowUrl: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32],
+      className: 'cafe-marker',
+    });
+
+    L.marker([lat, lon], { icon }).bindPopup(popupHtml).addTo(cafeLayer);
+  });
+
+  if (cafesVisible && mapInstance) cafeLayer.addTo(mapInstance);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    MAIN FLOW
    ════════════════════════════════════════════════════════════════════ */
 function showLoading(text) {
@@ -1524,9 +1663,10 @@ async function processRoute(gpxText, sourceUrl) {
     maxDate.setDate(maxDate.getDate() + CONFIG.MAX_FORECAST_DAYS);
     dateInput.max = maxDate.toISOString().slice(0, 10);
 
-    const [incidents, weather] = await Promise.all([
+    const [incidents, weather, allCafes] = await Promise.all([
       fetchRouteClosures(route),
       fetchWeather(startPt.lat, startPt.lon, today),
+      fetchCafes(),
     ]);
 
     // Display closures
@@ -1534,6 +1674,12 @@ async function processRoute(gpxText, sourceUrl) {
     const closureToggle = document.getElementById('closuresToggle');
     const count = incidents.length;
     closureToggle.textContent = count > 0 ? `🚧 Closures (${count})` : '🚧 Closures (0)';
+
+    // Display nearby cafés
+    const nearbyCafes = filterNearbyCafes(allCafes, route.points);
+    displayCafes(nearbyCafes);
+    const cafeToggle = document.getElementById('cafesToggle');
+    cafeToggle.textContent = nearbyCafes.length > 0 ? `☕ Cafés (${nearbyCafes.length})` : '☕ Cafés (0)';
 
     // Display weather
     currentWeather = weather;
@@ -1561,6 +1707,7 @@ function resetAnalysis() {
   currentWeather = null;
   if (routeLayer) { mapInstance.removeLayer(routeLayer); routeLayer = null; }
   if (closureLayer) { mapInstance.removeLayer(closureLayer); closureLayer = null; }
+  if (cafeLayer) { mapInstance.removeLayer(cafeLayer); cafeLayer = null; }
   if (elevChart) { elevChart.destroy(); elevChart = null; }
   hideError();
   document.getElementById('gpxUrl').value = '';
@@ -1610,6 +1757,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const shareBtn = document.getElementById('shareBtn');
   const speedSlider = document.getElementById('speedSlider');
   const closuresToggle = document.getElementById('closuresToggle');
+  const cafesToggle = document.getElementById('cafesToggle');
   const weatherDate = document.getElementById('weatherDate');
 
   // Drag & drop
@@ -1693,6 +1841,16 @@ document.addEventListener('DOMContentLoaded', function() {
     if (closureLayer && mapInstance) {
       if (closuresVisible) closureLayer.addTo(mapInstance);
       else mapInstance.removeLayer(closureLayer);
+    }
+  });
+
+  // Cafés toggle
+  cafesToggle.addEventListener('click', function() {
+    cafesVisible = !cafesVisible;
+    cafesToggle.classList.toggle('active', cafesVisible);
+    if (cafeLayer && mapInstance) {
+      if (cafesVisible) cafeLayer.addTo(mapInstance);
+      else mapInstance.removeLayer(cafeLayer);
     }
   });
 
