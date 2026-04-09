@@ -559,6 +559,174 @@
 
     .cafe-marker { background: none; border: none; }
 
+    /* ─── NEARBY CAFÉ MARKERS (OpenStreetMap data) ──────────────── */
+    .osm-cafe-pin {
+      width: 32px; height: 32px;
+      background: #d97706;
+      border: 2.5px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    /* Popup container — strip Leaflet chrome, let .osm-cafe-card handle all styling */
+    .osm-cafe-popup .leaflet-popup-content-wrapper {
+      padding: 0;
+      background: none;
+      box-shadow: none;
+      border-radius: 0;
+    }
+    .osm-cafe-popup .leaflet-popup-content { margin: 0; }
+    .osm-cafe-popup .leaflet-popup-tip-container { display: none; }
+    .osm-cafe-popup .leaflet-popup-close-button {
+      top: 6px !important;
+      right: 8px !important;
+      color: var(--grey-400) !important;
+      font-size: 18px !important;
+      z-index: 10;
+    }
+    .osm-cafe-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.18);
+      padding: 0.6rem 0.75rem;
+      width: 210px;
+      overflow: hidden;
+      font-family: var(--font-main);
+      border-top: 3px solid #d97706;
+      pointer-events: auto;
+      word-break: break-word;
+    }
+    .osm-cafe-card.osm-pub-card { border-top-color: #16a34a; }
+    .osm-cafe-type { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.2rem; }
+    .osm-cafe-type.type-cafe { color: #d97706; }
+    .osm-cafe-type.type-pub  { color: #16a34a; }
+    .osm-cafe-name { font-size: 0.82rem; font-weight: 700; color: var(--dark); margin-bottom: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .osm-cafe-location { font-size: 0.72rem; color: var(--grey-600); margin-bottom: 0.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .osm-cafe-stars { color: #d97706; font-size: 0.75rem; margin-bottom: 0.2rem; display: block; letter-spacing: 0.05em; }
+    .osm-cafe-hours { font-size: 0.69rem; color: var(--grey-600); margin-bottom: 0.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .osm-cafe-note { font-size: 0.68rem; color: #92400e; background: #fef3c7; border-radius: 4px; padding: 0.15rem 0.35rem; margin-bottom: 0.2rem; display: inline-block; }
+    .osm-cafe-link { display: block; font-size: 0.72rem; color: var(--teal-dark); margin-bottom: 0.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .osm-cafe-link:hover { color: var(--teal); }
+    .osm-cafe-source { font-size: 0.62rem; color: var(--grey-400); border-top: 1px solid var(--grey-100); padding-top: 0.25rem; margin-top: 0.25rem; }
+
+    /* ─── NEARBY STOP WINDOW SLIDER (inline in map toolbar) ─────── */
+    .map-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.45rem 0.75rem;
+      background: var(--grey-50);
+      border-bottom: 1px solid var(--grey-100);
+    }
+    .map-slider-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--grey-600);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .cafe-window-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--dark);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .dual-range-wrap {
+      position: relative;
+      flex: 1;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      min-width: 80px;
+    }
+    .dual-range-track {
+      position: absolute;
+      left: 0; right: 0;
+      height: 4px;
+      background: var(--grey-200);
+      border-radius: 2px;
+    }
+    .dual-range-fill {
+      position: absolute;
+      height: 4px;
+      background: var(--teal);
+      border-radius: 2px;
+      cursor: grab;
+    }
+    .dual-range-fill:active { cursor: grabbing; }
+    .dual-range-fill.dragging { cursor: grabbing; }
+    .dual-range-input {
+      position: absolute;
+      width: 100%;
+      height: 4px;
+      background: transparent;
+      pointer-events: none;
+      appearance: none;
+      -webkit-appearance: none;
+      outline: none;
+    }
+    .dual-range-input::-webkit-slider-thumb {
+      pointer-events: all;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--teal);
+      border: 2.5px solid white;
+      box-shadow: 0 0 0 1.5px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,.25);
+      cursor: grab;
+      transition: transform 0.1s ease;
+    }
+    .dual-range-input::-webkit-slider-thumb:active { transform: scale(1.2); cursor: grabbing; }
+    .dual-range-input::-moz-range-thumb {
+      pointer-events: all;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--teal);
+      border: 2.5px solid white;
+      box-shadow: 0 0 0 1.5px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,.25);
+      cursor: grab;
+    }
+    /* Spinner for button searching state */
+    .btn-spinner {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 3px;
+      opacity: 0.8;
+    }
+
+    /* ─── ELEVATION SYNC MARKER ─────────────────────────────────── */
+    .elev-sync-dot {
+      width: 14px; height: 14px;
+      background: var(--teal);
+      border: 2.5px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(44,188,179,0.3), 0 2px 6px rgba(0,0,0,.3);
+    }
+    .elev-dist-tooltip {
+      background: rgba(30,42,56,0.88);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    }
+    .elev-dist-tooltip::before { display: none; } /* hide default tooltip arrow */
+
     /* ─── ACTIONS BAR ───────────────────────────────────────────── */
     .actions-bar {
       display: flex;
@@ -760,8 +928,21 @@
         <span class="route-title" id="routeTitle">Route</span>
         <div class="toolbar-actions">
           <button class="toggle-btn active" id="closuresToggle" type="button">🚧 Closures</button>
-          <button class="toggle-btn active" id="cafesToggle" type="button">☕ Cafés</button>
+          <button class="toggle-btn active" id="soccCafesToggle" type="button">☕ SOCC Cafés</button>
+          <button class="toggle-btn active" id="osmCafesToggle" type="button">☕ Nearby Stops</button>
         </div>
+      </div>
+      <!-- Nearby stop window slider — sits between toolbar and map -->
+      <div class="map-slider-row" id="cafeWindowBar">
+        <span class="map-slider-label">Stop window</span>
+        <div class="dual-range-wrap">
+          <div class="dual-range-track">
+            <div class="dual-range-fill" id="cafeRangeFill"></div>
+          </div>
+          <input type="range" id="cafeWindowStart" class="dual-range-input" min="0" max="100" step="0.5" value="40">
+          <input type="range" id="cafeWindowEnd"   class="dual-range-input" min="0" max="100" step="0.5" value="75">
+        </div>
+        <span id="cafeWindowLabel" class="cafe-window-label">—</span>
       </div>
       <div id="analyserMap"></div>
     </div>
@@ -891,6 +1072,10 @@ let currentWeather = null;
 let closuresVisible = true;
 let cafeLayer = null;
 let cafesVisible = true;
+let osmCafeLayer = null;
+let osmCafesVisible = true;
+let elevMarker = null;
+let elevSamples = []; // { lat, lon, ele, cumDistKm, routeIdx } — parallel to elevChart data points
 let currentGpxUrl = null;  // for shareable links
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1025,6 +1210,47 @@ async function initMap() {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 18,
   }).addTo(mapInstance);
+
+  // Map → elevation sync: hover near the route moves the dot on the map
+  // and highlights the matching position on the elevation chart.
+  mapInstance.on('mousemove', function(e) {
+    if (!elevSamples.length) return;
+    const { lat, lng } = e.latlng;
+    let minSq = Infinity, nearestIdx = -1;
+    for (let i = 0; i < elevSamples.length; i++) {
+      const s = elevSamples[i];
+      const sq = (s.lat - lat) ** 2 + (s.lon - lng) ** 2;
+      if (sq < minSq) { minSq = sq; nearestIdx = i; }
+    }
+    // Only sync within ~1.5km of route (≈0.00022 sq-degrees at UK latitudes)
+    if (nearestIdx < 0 || minSq > 0.00022) {
+      if (elevMarker && mapInstance.hasLayer(elevMarker)) mapInstance.removeLayer(elevMarker);
+      if (elevChart) { elevChart.tooltip.setActiveElements([], {}); elevChart.update('none'); }
+      return;
+    }
+    const sample = elevSamples[nearestIdx];
+    const distLabel = `${sample.cumDistKm.toFixed(1)} km / ${(sample.cumDistKm / 1.60934).toFixed(1)} mi`;
+    // Show / move the sync dot on the map
+    if (!elevMarker) {
+      const icon = L.divIcon({ className: '', html: '<div class="elev-sync-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+      elevMarker = L.marker([sample.lat, sample.lon], { icon, interactive: false, zIndexOffset: 1000 })
+        .bindTooltip(distLabel, { permanent: true, direction: 'top', className: 'elev-dist-tooltip', offset: [0, -18] });
+    } else {
+      elevMarker.setTooltipContent(distLabel);
+    }
+    elevMarker.setLatLng([sample.lat, sample.lon]);
+    if (!mapInstance.hasLayer(elevMarker)) elevMarker.addTo(mapInstance);
+    // Highlight matching position on elevation chart
+    if (elevChart) {
+      elevChart.tooltip.setActiveElements([{ datasetIndex: 0, index: nearestIdx }], { x: 0, y: 0 });
+      elevChart.update('none');
+    }
+  });
+
+  mapEl.addEventListener('mouseleave', function() {
+    if (elevMarker && mapInstance && mapInstance.hasLayer(elevMarker)) mapInstance.removeLayer(elevMarker);
+    if (elevChart) { elevChart.tooltip.setActiveElements([], {}); elevChart.update('none'); }
+  });
 }
 
 function displayRoute(route) {
@@ -1139,13 +1365,15 @@ function buildElevationProfile(route) {
   const distLabels = [];
   let cumDist = 0;
 
-  // Downsample to ~300 points
+  // Downsample to ~300 points and record sample metadata for map sync
+  elevSamples = [];
   const step = Math.max(1, Math.floor(route.points.length / 300));
   for (let i = 0; i < route.points.length; i += step) {
     if (i > 0) cumDist += haversine(route.points[Math.max(0, i - step)], route.points[i]);
     if (route.points[i].ele !== null) {
       elevData.push(route.points[i].ele);
       distLabels.push((cumDist / 1000).toFixed(1));
+      elevSamples.push({ lat: route.points[i].lat, lon: route.points[i].lon, ele: route.points[i].ele, cumDistKm: cumDist / 1000, routeIdx: i });
     }
   }
 
@@ -1153,6 +1381,56 @@ function buildElevationProfile(route) {
     container.innerHTML = '<div class="no-elevation">No elevation data in this GPX file</div>';
     return;
   }
+
+  // Plugin: vertical crosshair line + chart→map marker sync
+  const hoverLinePlugin = {
+    id: 'hoverLine',
+    afterDraw(chart) {
+      const active = chart.tooltip._active;
+      if (!active || !active.length) return;
+      const x = active[0].element.x;
+      const { ctx, chartArea: { top, bottom } } = chart;
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(44,188,179,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+      ctx.stroke();
+      ctx.restore();
+    },
+    afterEvent(chart, args) {
+      const e = args.event;
+      if (e.type === 'mousemove') {
+        const active = chart.tooltip._active;
+        if (active && active.length && elevSamples.length && mapInstance) {
+          const sample = elevSamples[active[0].index];
+          if (!sample) return;
+          const distLabel = `${sample.cumDistKm.toFixed(1)} km / ${(sample.cumDistKm / 1.60934).toFixed(1)} mi`;
+          if (!elevMarker) {
+            const icon = L.divIcon({ className: '', html: '<div class="elev-sync-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+            elevMarker = L.marker([sample.lat, sample.lon], { icon, interactive: false, zIndexOffset: 1000 })
+              .bindTooltip(distLabel, { permanent: true, direction: 'top', className: 'elev-dist-tooltip', offset: [0, -18] });
+          } else {
+            elevMarker.setTooltipContent(distLabel);
+          }
+          elevMarker.setLatLng([sample.lat, sample.lon]);
+          if (!mapInstance.hasLayer(elevMarker)) elevMarker.addTo(mapInstance);
+        }
+      } else if (e.type === 'mouseout') {
+        if (elevMarker && mapInstance && mapInstance.hasLayer(elevMarker)) {
+          mapInstance.removeLayer(elevMarker);
+        }
+      }
+    },
+  };
+
+  // Build a miles label array parallel to distLabels for the top axis
+  const milesLabels = distLabels.map(km => {
+    const v = parseFloat(km);
+    return isNaN(v) ? '' : (v / 1.60934).toFixed(1);
+  });
 
   if (elevChart) elevChart.destroy();
   elevChart = new Chart(canvas, {
@@ -1167,8 +1445,10 @@ function buildElevationProfile(route) {
         pointRadius: 0,
         fill: true,
         tension: 0.4,
+        xAxisID: 'x',
       }]
     },
+    plugins: [hoverLinePlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -1176,15 +1456,32 @@ function buildElevationProfile(route) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (items) => `${items[0].label} km`,
-            label: (item) => `${Math.round(item.raw)} m`,
+            title: (items) => {
+              const i = items[0].dataIndex;
+              return `${distLabels[i]} km  /  ${milesLabels[i]} mi`;
+            },
+            label: (item) => `${Math.round(item.raw)} m elevation`,
           }
         }
       },
       scales: {
         x: {
+          position: 'bottom',
           display: true,
-          ticks: { font: { size: 9 }, color: '#8c97a8', maxTicksLimit: 8, callback: (v, i, t) => distLabels[i] ? distLabels[i] + ' km' : '' },
+          ticks: { font: { size: 9 }, color: '#8c97a8', maxTicksLimit: 8, callback: (v, i) => distLabels[i] ? distLabels[i] + ' km' : '' },
+          grid: { display: false },
+        },
+        xMiles: {
+          type: 'category',
+          labels: distLabels,
+          position: 'top',
+          display: true,
+          ticks: {
+            font: { size: 9 },
+            color: '#8c97a8',
+            maxTicksLimit: 8,
+            callback: (v, i) => milesLabels[i] ? milesLabels[i] + ' mi' : '',
+          },
           grid: { display: false },
         },
         y: {
@@ -1597,6 +1894,290 @@ function displayCafes(cafes) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   NEARBY CAFÉS — OpenStreetMap via Overpass API
+   Finds cafés/coffee shops in the 40–75% window of the route,
+   within 1 km of the track, sorted closest-first.
+   ════════════════════════════════════════════════════════════════════ */
+async function fetchOsmCafes(route, startFrac = 0.40, endFrac = 0.75) {
+  const pts = route.points;
+  if (pts.length < 2) return [];
+
+  // Build cumulative distances for all points
+  const cumDists = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cumDists.push(cumDists[i - 1] + haversine(pts[i - 1], pts[i]));
+  }
+  const total = route.totalDist;
+  const lo = total * startFrac;
+  const hi = total * endFrac;
+
+  // Collect points in the 40–75% window
+  const windowPts = pts.filter((_, i) => cumDists[i] >= lo && cumDists[i] <= hi);
+  if (windowPts.length === 0) return [];
+
+  // Sample the window at fixed 500m intervals so there are no blind spots at any radius ≥ 500m.
+  // Fixed-count downsampling (e.g. ÷40) creates gaps proportional to GPX density — a dense
+  // 62km window would produce 1550m spacing, leaving 550m gaps at 1km radius where cafes
+  // could be missed. Distance-based sampling guarantees coverage regardless of GPX density.
+  // POST avoids URL length limits; `around` polyline is far more efficient than a bbox.
+  const SAMPLE_SPACING_M = 500;
+  const windowCumDists = pts.reduce((acc, _, i) => {
+    if (cumDists[i] >= lo && cumDists[i] <= hi) acc.push({ pt: pts[i], d: cumDists[i] });
+    return acc;
+  }, []);
+  const samples = [windowCumDists[0].pt];
+  let lastD = windowCumDists[0].d;
+  for (let i = 1; i < windowCumDists.length; i++) {
+    if (windowCumDists[i].d - lastD >= SAMPLE_SPACING_M) {
+      samples.push(windowCumDists[i].pt);
+      lastD = windowCumDists[i].d;
+    }
+  }
+  // Always include the last point to avoid a gap at the window end
+  const lastWin = windowCumDists[windowCumDists.length - 1].pt;
+  if (samples[samples.length - 1] !== lastWin) samples.push(lastWin);
+  const coordStr = samples.map(p => `${p.lat},${p.lon}`).join(',');
+
+  // Expanding radius: 1km → 1.5km → 2km until ≥ 3 results found.
+  // Query includes cafes, pubs, and tea rooms — all realistic cyclist stops.
+  // Uses POST + Overpass `around` polyline filter (far more efficient than bbox for long routes).
+  const radii = [1000, 1500, 2000];
+  let hadSuccessfulResponse = false;
+  for (const radius of radii) {
+    const query = `[out:json][timeout:14];(`
+      + `node["amenity"="cafe"](around:${radius},${coordStr});`
+      + `node["amenity"="coffee_shop"](around:${radius},${coordStr});`
+      + `node["amenity"="pub"](around:${radius},${coordStr});`
+      + `node["amenity"="tea_room"](around:${radius},${coordStr});`
+      + `);out body;`;
+    try {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query),
+        signal: AbortSignal.timeout(18000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      hadSuccessfulResponse = true;
+      const nodes = json.elements || [];
+
+      const results = [];
+      for (const node of nodes) {
+        const { lat, lon, tags = {} } = node;
+        if (!lat || !lon) continue;
+
+        // Skip permanently closed venues (opening_hours="off" is the OSM convention)
+        const oh = safe(tags.opening_hours);
+        if (oh.toLowerCase() === 'off') continue;
+
+        // Use all window points for accurate distance — fast squared-degree pre-filter
+        // avoids full trig on every point, then one accurate haversine at the end.
+        let minSq = Infinity, nearLat = windowPts[0].lat, nearLon = windowPts[0].lon;
+        for (const p of windowPts) {
+          const sq = (lat - p.lat) ** 2 + (lon - p.lon) ** 2;
+          if (sq < minSq) { minSq = sq; nearLat = p.lat; nearLon = p.lon; }
+        }
+        const minDist = haversineM(lat, lon, nearLat, nearLon);
+
+        const hours = oh.length > 45 ? oh.slice(0, 43) + '\u2026' : oh;
+        const starNum = parseFloat(tags.stars || tags['rating:stars'] || '');
+        const amenity = safe(tags.amenity);
+        const shopTag = safe(tags.shop);
+
+        // Build a cyclist note for unusual venues (e.g. a café inside a jewellery shop)
+        let cyclistNote = '';
+        if (shopTag && !['convenience', 'bakery', 'deli', 'farm'].includes(shopTag)) {
+          cyclistNote = shopTag.charAt(0).toUpperCase() + shopTag.slice(1) + ' shop with café';
+        }
+
+        results.push({
+          lat, lon, amenity,
+          osmId: node.id,
+          name: safe(tags.name) || (amenity === 'pub' ? 'Pub' : 'Caf\u00e9'),
+          website: safe(tags.website || tags['contact:website'] || tags['contact:url'] || ''),
+          hours,
+          starNum: isNaN(starNum) ? null : starNum,
+          village: safe(tags['addr:village'] || tags['addr:town'] || tags['addr:city'] || tags['addr:hamlet'] || tags['addr:suburb'] || ''),
+          cyclistNote,
+          minDist: Math.round(minDist),
+        });
+      }
+      results.sort((a, b) => a.minDist - b.minDist);
+
+      if (results.length >= 3 || radius === radii[radii.length - 1]) return results;
+      console.log(`Nearby stops: only ${results.length} at ${radius}m, expanding search…`);
+    } catch (e) {
+      console.warn(`Nearby stops fetch failed at ${radius}m:`, e.message);
+    }
+  }
+  // null = every attempt threw (network error, rate-limit, timeout) → callers keep existing layer
+  // [] = requests succeeded but found nothing → callers clear layer normally
+  return hadSuccessfulResponse ? [] : null;
+}
+
+function displayOsmCafes(stops) {
+  if (osmCafeLayer && mapInstance) mapInstance.removeLayer(osmCafeLayer);
+  osmCafeLayer = L.layerGroup();
+
+  const cafeSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17 8h1a4 4 0 0 1 0 8h-1"/>
+    <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/>
+    <line x1="6" y1="2" x2="6" y2="4"/>
+    <line x1="10" y1="2" x2="10" y2="4"/>
+    <line x1="14" y1="2" x2="14" y2="4"/>
+  </svg>`;
+
+  // Beer mug for pubs
+  const pubSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17 11h1a3 3 0 0 1 0 6h-1"/>
+    <path d="M5 4h11l-1.5 13.5a1 1 0 0 1-1 .5H7.5a1 1 0 0 1-1-.5L5 4z"/>
+    <line x1="5" y1="9" x2="17" y2="9"/>
+  </svg>`;
+
+  stops.forEach(stop => {
+    const isPub = stop.amenity === 'pub';
+    const colour = isPub ? '#16a34a' : '#d97706';
+    const pinHtml = `<div class="osm-cafe-pin" style="background:${colour}">${isPub ? pubSvg : cafeSvg}</div>`;
+    const icon = L.divIcon({ className: '', html: pinHtml, iconSize: [32, 32], iconAnchor: [16, 16] });
+
+    const name = escHtml(stop.name);
+    const village = escHtml(stop.village);
+
+    const typeLabel = isPub ? '🍺 Pub' : '☕ Café';
+    const typeClass = isPub ? 'type-pub' : 'type-cafe';
+    const cardClass = isPub ? 'osm-cafe-card osm-pub-card' : 'osm-cafe-card';
+
+    let starsHtml = '';
+    if (stop.starNum !== null) {
+      const full = Math.round(stop.starNum);
+      starsHtml = `<span class="osm-cafe-stars">${'★'.repeat(Math.min(5, full))}${'☆'.repeat(Math.max(0, 5 - full))}</span>`;
+    }
+
+    // Website link (own site if known)
+    const websiteHtml = stop.website
+      ? `<a href="${escHtml(stop.website)}" target="_blank" rel="noopener noreferrer" class="osm-cafe-link">🌐 ${escHtml(stop.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''))}</a>`
+      : '';
+
+    // Google search link — uses name + village when available, otherwise name + lat/lon
+    // so Google always has enough context to surface the right place.
+    const googleQuery = stop.village
+      ? `${stop.name} ${stop.village}`
+      : `${stop.name}`;
+    const googleMapsUrl = stop.village
+      ? `https://www.google.com/maps/search/${encodeURIComponent(googleQuery)}`
+      : `https://www.google.com/maps/search/${encodeURIComponent(stop.name)}/@${stop.lat},${stop.lon},16z`;
+    const googleHtml = `<a href="${escHtml(googleMapsUrl)}" target="_blank" rel="noopener noreferrer" class="osm-cafe-link">🔍 Find on Google Maps</a>`;
+
+    const cardHtml = `<div class="${escHtml(cardClass)}">
+      <div class="osm-cafe-type ${escHtml(typeClass)}">${typeLabel}</div>
+      <div class="osm-cafe-name">${name}</div>
+      ${village ? `<div class="osm-cafe-location">📍 ${village}</div>` : ''}
+      ${starsHtml}
+      ${stop.cyclistNote ? `<span class="osm-cafe-note">⚠️ ${escHtml(stop.cyclistNote)}</span>` : ''}
+      ${stop.hours ? `<div class="osm-cafe-hours">🕐 ${escHtml(stop.hours)}</div>` : ''}
+      ${websiteHtml}
+      ${googleHtml}
+      <div class="osm-cafe-source">${stop.minDist}m from route</div>
+    </div>`;
+
+    const marker = L.marker([stop.lat, stop.lon], { icon });
+    // Popup (not tooltip) — stays open when mouse moves into the card so links are clickable.
+    // Click marker to open, click × or elsewhere to close. Works on desktop and mobile.
+    marker.bindPopup(cardHtml, {
+      maxWidth: 220,
+      className: 'osm-cafe-popup',
+      autoPan: true,
+    });
+    marker.addTo(osmCafeLayer);
+  });
+
+  if (osmCafesVisible && mapInstance) osmCafeLayer.addTo(mapInstance);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   NEARBY STOP WINDOW SLIDER
+   ════════════════════════════════════════════════════════════════════ */
+let cafeWindowTimer = null;
+
+function initCafeWindow(route) {
+  const totalMiles = route.totalDist / 1609.344;
+  const maxMiles = Math.ceil(totalMiles * 2) / 2; // round up to nearest 0.5 mi
+  const startEl = document.getElementById('cafeWindowStart');
+  const endEl   = document.getElementById('cafeWindowEnd');
+
+  startEl.min = 0; startEl.max = maxMiles; startEl.step = 0.5;
+  endEl.min   = 0; endEl.max   = maxMiles; endEl.step   = 0.5;
+
+  // Default window: 40–75% of route expressed in miles
+  startEl.value = (Math.round(totalMiles * 0.40 * 2) / 2).toFixed(1);
+  endEl.value   = (Math.round(totalMiles * 0.75 * 2) / 2).toFixed(1);
+
+  updateCafeWindowFill();
+}
+
+function updateCafeWindowFill() {
+  const startEl = document.getElementById('cafeWindowStart');
+  const endEl   = document.getElementById('cafeWindowEnd');
+  const maxMiles = parseFloat(startEl.max) || 1;
+  const startMi  = parseFloat(startEl.value);
+  const endMi    = parseFloat(endEl.value);
+
+  const leftPct  = (startMi / maxMiles) * 100;
+  const widthPct = ((endMi - startMi) / maxMiles) * 100;
+  const fill = document.getElementById('cafeRangeFill');
+  fill.style.left  = leftPct  + '%';
+  fill.style.width = Math.max(0, widthPct) + '%';
+
+  const startKm = (startMi * 1.60934).toFixed(0);
+  const endKm   = (endMi   * 1.60934).toFixed(0);
+  document.getElementById('cafeWindowLabel').textContent =
+    `${startMi.toFixed(1)} – ${endMi.toFixed(1)} mi  (${startKm} – ${endKm} km)`;
+}
+
+function onCafeWindowInput(movedSlider) {
+  const startEl = document.getElementById('cafeWindowStart');
+  const endEl   = document.getElementById('cafeWindowEnd');
+  let startMi = parseFloat(startEl.value);
+  let endMi   = parseFloat(endEl.value);
+  const MIN_GAP = 2; // miles
+
+  // Clamp so handles don't cross, maintaining a minimum gap
+  if (movedSlider === 'start' && startMi > endMi - MIN_GAP) {
+    startEl.value = (endMi - MIN_GAP).toFixed(1);
+  }
+  if (movedSlider === 'end' && endMi < startMi + MIN_GAP) {
+    endEl.value = (startMi + MIN_GAP).toFixed(1);
+  }
+
+  updateCafeWindowFill();
+
+  // Debounce the Overpass fetch so it only fires 600ms after the user stops dragging
+  clearTimeout(cafeWindowTimer);
+  cafeWindowTimer = setTimeout(async () => {
+    if (!currentRoute) return;
+    const btn = document.getElementById('osmCafesToggle');
+    const prevLabel = btn.innerHTML; // save so we can restore if fetch fails
+    btn.innerHTML = '<span class="btn-spinner"></span> Searching…';
+    btn.disabled = true;
+    const totalMiles = currentRoute.totalDist / 1609.344;
+    const sf = parseFloat(document.getElementById('cafeWindowStart').value) / totalMiles;
+    const ef = parseFloat(document.getElementById('cafeWindowEnd').value)   / totalMiles;
+    const results = await fetchOsmCafes(currentRoute, Math.max(0, sf), Math.min(1, ef));
+    if (results !== null) {
+      displayOsmCafes(results);
+      btn.innerHTML = results.length > 0 ? `☕ Nearby Stops (${results.length})` : '☕ Nearby Stops (0)';
+    } else {
+      // All API attempts failed — keep existing markers, restore prior button label
+      btn.innerHTML = prevLabel;
+    }
+    btn.disabled = false;
+  }, 600);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    MAIN FLOW
    ════════════════════════════════════════════════════════════════════ */
 function showLoading(text) {
@@ -1647,6 +2228,9 @@ async function processRoute(gpxText, sourceUrl) {
     // Build elevation profile
     buildElevationProfile(route);
 
+    // Initialise the nearby stop window slider with this route's distance
+    initCafeWindow(route);
+
     // Show share button if URL-based
     document.getElementById('shareBtn').style.display = sourceUrl ? '' : 'none';
 
@@ -1663,10 +2247,11 @@ async function processRoute(gpxText, sourceUrl) {
     maxDate.setDate(maxDate.getDate() + CONFIG.MAX_FORECAST_DAYS);
     dateInput.max = maxDate.toISOString().slice(0, 10);
 
-    const [incidents, weather, allCafes] = await Promise.all([
+    const [incidents, weather, allCafes, osmCafes] = await Promise.all([
       fetchRouteClosures(route),
       fetchWeather(startPt.lat, startPt.lon, today),
       fetchCafes(),
+      fetchOsmCafes(route),
     ]);
 
     // Display closures
@@ -1675,11 +2260,16 @@ async function processRoute(gpxText, sourceUrl) {
     const count = incidents.length;
     closureToggle.textContent = count > 0 ? `🚧 Closures (${count})` : '🚧 Closures (0)';
 
-    // Display nearby cafés
+    // Display SOCC cafés
     const nearbyCafes = filterNearbyCafes(allCafes, route.points);
     displayCafes(nearbyCafes);
-    const cafeToggle = document.getElementById('cafesToggle');
-    cafeToggle.textContent = nearbyCafes.length > 0 ? `☕ Cafés (${nearbyCafes.length})` : '☕ Cafés (0)';
+    document.getElementById('soccCafesToggle').textContent = nearbyCafes.length > 0 ? `☕ SOCC Cafés (${nearbyCafes.length})` : '☕ SOCC Cafés (0)';
+
+    // Display nearby cafés (OpenStreetMap) — null means all API attempts failed, keep layer as-is
+    if (osmCafes !== null) {
+      displayOsmCafes(osmCafes);
+      document.getElementById('osmCafesToggle').textContent = osmCafes.length > 0 ? `☕ Nearby Stops (${osmCafes.length})` : '☕ Nearby Stops (0)';
+    }
 
     // Display weather
     currentWeather = weather;
@@ -1708,6 +2298,11 @@ function resetAnalysis() {
   if (routeLayer) { mapInstance.removeLayer(routeLayer); routeLayer = null; }
   if (closureLayer) { mapInstance.removeLayer(closureLayer); closureLayer = null; }
   if (cafeLayer) { mapInstance.removeLayer(cafeLayer); cafeLayer = null; }
+  if (osmCafeLayer) { mapInstance.removeLayer(osmCafeLayer); osmCafeLayer = null; }
+  clearTimeout(cafeWindowTimer);
+  if (elevMarker && mapInstance.hasLayer(elevMarker)) { mapInstance.removeLayer(elevMarker); }
+  elevMarker = null;
+  elevSamples = [];
   if (elevChart) { elevChart.destroy(); elevChart = null; }
   hideError();
   document.getElementById('gpxUrl').value = '';
@@ -1757,7 +2352,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const shareBtn = document.getElementById('shareBtn');
   const speedSlider = document.getElementById('speedSlider');
   const closuresToggle = document.getElementById('closuresToggle');
-  const cafesToggle = document.getElementById('cafesToggle');
+  const soccCafesToggle = document.getElementById('soccCafesToggle');
+  const osmCafesToggle = document.getElementById('osmCafesToggle');
   const weatherDate = document.getElementById('weatherDate');
 
   // Drag & drop
@@ -1844,15 +2440,84 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Cafés toggle
-  cafesToggle.addEventListener('click', function() {
+  // SOCC Cafés toggle
+  soccCafesToggle.addEventListener('click', function() {
     cafesVisible = !cafesVisible;
-    cafesToggle.classList.toggle('active', cafesVisible);
+    soccCafesToggle.classList.toggle('active', cafesVisible);
     if (cafeLayer && mapInstance) {
       if (cafesVisible) cafeLayer.addTo(mapInstance);
       else mapInstance.removeLayer(cafeLayer);
     }
   });
+
+  // Nearby Cafés (OpenStreetMap) toggle
+  osmCafesToggle.addEventListener('click', function() {
+    osmCafesVisible = !osmCafesVisible;
+    osmCafesToggle.classList.toggle('active', osmCafesVisible);
+    if (osmCafeLayer && mapInstance) {
+      if (osmCafesVisible) osmCafeLayer.addTo(mapInstance);
+      else mapInstance.removeLayer(osmCafeLayer);
+    }
+  });
+
+  // Nearby stop window — individual handle drag
+  document.getElementById('cafeWindowStart').addEventListener('input', () => onCafeWindowInput('start'));
+  document.getElementById('cafeWindowEnd').addEventListener('input',   () => onCafeWindowInput('end'));
+
+  // Fill-drag: dragging the teal bar moves the whole window without changing its size
+  (function() {
+    const fill      = document.getElementById('cafeRangeFill');
+    const startEl   = document.getElementById('cafeWindowStart');
+    const endEl     = document.getElementById('cafeWindowEnd');
+    const wrap      = fill.closest('.dual-range-wrap');
+
+    function startDrag(clientX) {
+      const startValAtDrag = parseFloat(startEl.value);
+      const endValAtDrag   = parseFloat(endEl.value);
+      const windowSize     = endValAtDrag - startValAtDrag;
+      const maxMiles       = parseFloat(startEl.max);
+      const trackWidth     = wrap.getBoundingClientRect().width;
+      const originX        = clientX;
+      fill.classList.add('dragging');
+
+      function onMove(cx) {
+        const deltaMiles = ((cx - originX) / trackWidth) * maxMiles;
+        let newStart = startValAtDrag + deltaMiles;
+        let newEnd   = newStart + windowSize;
+        // Clamp to valid range while keeping window size fixed
+        if (newStart < 0)          { newStart = 0;          newEnd = windowSize; }
+        if (newEnd   > maxMiles)   { newEnd   = maxMiles;   newStart = maxMiles - windowSize; }
+        newStart = Math.round(newStart * 2) / 2;
+        newEnd   = Math.round(newEnd   * 2) / 2;
+        startEl.value = newStart;
+        endEl.value   = newEnd;
+        updateCafeWindowFill();
+        clearTimeout(cafeWindowTimer); // reset fetch debounce while dragging
+      }
+
+      function onUp() {
+        fill.classList.remove('dragging');
+        document.removeEventListener('mousemove', mouseMove);
+        document.removeEventListener('mouseup',   mouseUp);
+        document.removeEventListener('touchmove', touchMove);
+        document.removeEventListener('touchend',  touchUp);
+        onCafeWindowInput('start'); // triggers debounced fetch
+      }
+
+      const mouseMove = e => onMove(e.clientX);
+      const mouseUp   = onUp;
+      const touchMove = e => { e.preventDefault(); onMove(e.touches[0].clientX); };
+      const touchUp   = onUp;
+
+      document.addEventListener('mousemove', mouseMove);
+      document.addEventListener('mouseup',   mouseUp);
+      document.addEventListener('touchmove', touchMove, { passive: false });
+      document.addEventListener('touchend',  touchUp);
+    }
+
+    fill.addEventListener('mousedown',  e => { e.preventDefault(); startDrag(e.clientX); });
+    fill.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0].clientX); }, { passive: false });
+  })();
 
   // Weather date change
   weatherDate.addEventListener('change', async function() {
